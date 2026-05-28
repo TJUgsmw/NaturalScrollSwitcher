@@ -6,33 +6,36 @@ import NaturalScrollCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let preferences = NaturalScrollPreferences()
     private let settings = AppSettings()
+    private let localizer = AppLocalizer()
     private let monitor = EventTapMonitor()
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
-    private let modeItem = NSMenuItem(title: "Current: Unknown", action: nil, keyEquivalent: "")
-    private let systemSettingItem = NSMenuItem(title: "System setting: Unknown", action: nil, keyEquivalent: "")
-    private let autoSwitchItem = NSMenuItem(title: "Automatic Switching", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
-    private let mouseNaturalItem = NSMenuItem(title: "Mouse Natural Scrolling", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
-    private let trackpadNaturalItem = NSMenuItem(title: "Trackpad Natural Scrolling", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
-    private let permissionItem = NSMenuItem(title: "Permissions: Checking", action: nil, keyEquivalent: "")
-    private let tapStatusItem = NSMenuItem(title: "Listener: Starting", action: nil, keyEquivalent: "")
-    private let requestPermissionsItem = NSMenuItem(title: "Request Permissions...", action: #selector(requestPermissions), keyEquivalent: "")
-    private let openInputSettingsItem = NSMenuItem(title: "Open Input Monitoring Settings", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
-    private let openAccessibilitySettingsItem = NSMenuItem(title: "Open Accessibility Settings", action: #selector(openAccessibilitySettings), keyEquivalent: "")
-    private let switchMouseItem = NSMenuItem(title: "Switch to Mouse: Natural Off", action: #selector(switchToMouse), keyEquivalent: "")
-    private let switchTrackpadItem = NSMenuItem(title: "Switch to Trackpad: Natural On", action: #selector(switchToTrackpad), keyEquivalent: "")
-    private let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+    private let modeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let systemSettingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let autoSwitchItem = NSMenuItem(title: "", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
+    private let mouseNaturalItem = NSMenuItem(title: "", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
+    private let trackpadNaturalItem = NSMenuItem(title: "", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
+    private let permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let tapStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let requestPermissionsItem = NSMenuItem(title: "", action: #selector(requestPermissions), keyEquivalent: "")
+    private let openInputSettingsItem = NSMenuItem(title: "", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
+    private let openAccessibilitySettingsItem = NSMenuItem(title: "", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+    private let switchMouseItem = NSMenuItem(title: "", action: #selector(switchToMouse), keyEquivalent: "")
+    private let switchTrackpadItem = NSMenuItem(title: "", action: #selector(switchToTrackpad), keyEquivalent: "")
+    private let quitItem = NSMenuItem(title: "", action: #selector(quit), keyEquivalent: "q")
 
     private var autoSwitchEnabled = true
     private var permissionState = PermissionManager.currentState()
     private var lastInputSource: InputSource?
-    private var lastTapMessage = "Starting"
-    private var lastWriteStatus = "No switch yet"
+    private var lastTapMessage = ""
+    private var lastWriteStatus = ""
     private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        lastTapMessage = localizer.starting
+        lastWriteStatus = localizer.noSwitchYet
         configureMenu()
         configureMonitor()
         requestPermissions()
@@ -47,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func configureMenu() {
         statusItem.button?.title = "NS ?"
+        statusItem.button?.toolTip = localizer.statusTooltip
 
         [modeItem, systemSettingItem, permissionItem, tapStatusItem].forEach { item in
             item.isEnabled = false
@@ -93,9 +97,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleInputSource(source)
         }
 
-        monitor.onTapMessage = { [weak self] message in
-            self?.lastTapMessage = message
-            self?.updateMenu()
+        monitor.onTapStatus = { [weak self] status in
+            guard let self else {
+                return
+            }
+            self.lastTapMessage = self.localizedTapStatus(status)
+            self.updateMenu()
         }
     }
 
@@ -119,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if monitor.isRunning {
             monitor.stop()
         } else if !permissionState.canUseEventTap {
-            lastTapMessage = "Waiting for Input Monitoring permission"
+            lastTapMessage = localizer.waitingForInputMonitoringPermission
         }
 
         if changed {
@@ -142,10 +149,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let desiredValue = settings.naturalScrollEnabled(for: source)
-        let sourceTitle = source.menuTitle(naturalScrollEnabled: desiredValue)
         if preferences.currentValue() == desiredValue {
             lastInputSource = source
-            lastWriteStatus = "Already \(sourceTitle)"
+            lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
             updateMenu()
             return
         }
@@ -153,10 +159,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let result = preferences.setNaturalScrollEnabled(desiredValue)
         if result.succeeded {
             lastInputSource = source
-            lastWriteStatus = "Set \(sourceTitle)"
+            lastWriteStatus = localizer.didApply(source, naturalScrollEnabled: desiredValue)
         } else {
-            let observed = result.observedValue.map { $0 ? "On" : "Off" } ?? "Unknown"
-            lastWriteStatus = "Write failed, observed \(observed)"
+            lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
         }
 
         updateMenu()
@@ -165,18 +170,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateMenu() {
         let configuration = settings.configuration
         let currentModeTitle = lastInputSource.map {
-            $0.menuTitle(naturalScrollEnabled: configuration.naturalScrollEnabled(for: $0))
-        } ?? "Unknown"
-        modeItem.title = "Current: \(currentModeTitle)"
-        let systemValue = preferences.currentValue().map { $0 ? "Natural On" : "Natural Off" } ?? "Unknown"
-        systemSettingItem.title = "System setting: \(systemValue)"
-        permissionItem.title = permissionState.menuTitle
-        tapStatusItem.title = "Listener: \(lastTapMessage); \(lastWriteStatus)"
+            localizer.sourceTitle($0, naturalScrollEnabled: configuration.naturalScrollEnabled(for: $0))
+        } ?? localizer.unknown
+        modeItem.title = "\(localizer.currentPrefix): \(currentModeTitle)"
+        let systemValue = preferences.currentValue().map(localizer.naturalState) ?? localizer.unknown
+        systemSettingItem.title = "\(localizer.systemSettingPrefix): \(systemValue)"
+        permissionItem.title = localizer.permissionsTitle(
+            inputAccess: permissionState.listenEventAccess,
+            accessibilityTrusted: permissionState.accessibilityTrusted
+        )
+        tapStatusItem.title = localizer.listenerTitle(status: lastTapMessage, writeStatus: lastWriteStatus)
+        autoSwitchItem.title = localizer.automaticSwitching
         autoSwitchItem.state = autoSwitchEnabled ? .on : .off
+        mouseNaturalItem.title = localizer.mouseNaturalScrolling
         mouseNaturalItem.state = configuration.mouseNaturalScrollEnabled ? .on : .off
+        trackpadNaturalItem.title = localizer.trackpadNaturalScrolling
         trackpadNaturalItem.state = configuration.trackpadNaturalScrollEnabled ? .on : .off
-        switchMouseItem.title = "Switch to \(InputSource.mouse.menuTitle(naturalScrollEnabled: configuration.mouseNaturalScrollEnabled))"
-        switchTrackpadItem.title = "Switch to \(InputSource.trackpad.menuTitle(naturalScrollEnabled: configuration.trackpadNaturalScrollEnabled))"
+        switchMouseItem.title = localizer.switchToSourceTitle(
+            .mouse,
+            naturalScrollEnabled: configuration.mouseNaturalScrollEnabled
+        )
+        switchTrackpadItem.title = localizer.switchToSourceTitle(
+            .trackpad,
+            naturalScrollEnabled: configuration.trackpadNaturalScrollEnabled
+        )
+        requestPermissionsItem.title = localizer.requestPermissions
+        openInputSettingsItem.title = localizer.openInputMonitoringSettings
+        openAccessibilitySettingsItem.title = localizer.openAccessibilitySettings
+        quitItem.title = localizer.quit
 
         switch lastInputSource {
         case .mouse:
@@ -192,6 +213,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openAccessibilitySettingsItem.isHidden = permissionState.accessibilityTrusted
     }
 
+    private func localizedTapStatus(_ status: EventTapStatus) -> String {
+        switch status {
+        case .eventTapUnavailable:
+            return localizer.eventTapUnavailable
+        case .runLoopSourceUnavailable:
+            return localizer.runLoopSourceUnavailable
+        case .listening:
+            return localizer.listening
+        case .stopped:
+            return localizer.stopped
+        case .reenabled:
+            return localizer.eventTapReenabled
+        }
+    }
+
     @objc private func toggleAutomaticSwitching() {
         autoSwitchEnabled.toggle()
         refreshRuntimeState()
@@ -200,7 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleMouseNaturalScrolling() {
         let enabled = !settings.configuration.mouseNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .mouse)
-        lastWriteStatus = "Mouse preference: Natural \(enabled ? "On" : "Off")"
+        lastWriteStatus = localizer.preferenceChanged(source: .mouse, enabled: enabled)
         if lastInputSource == .mouse {
             apply(source: .mouse, userInitiated: true)
         } else {
@@ -211,7 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleTrackpadNaturalScrolling() {
         let enabled = !settings.configuration.trackpadNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .trackpad)
-        lastWriteStatus = "Trackpad preference: Natural \(enabled ? "On" : "Off")"
+        lastWriteStatus = localizer.preferenceChanged(source: .trackpad, enabled: enabled)
         if lastInputSource == .trackpad {
             apply(source: .trackpad, userInitiated: true)
         } else {

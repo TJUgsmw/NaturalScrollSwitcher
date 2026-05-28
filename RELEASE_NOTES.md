@@ -1,6 +1,6 @@
-# NaturalScrollSwitcher 0.2.0
+# NaturalScrollSwitcher 0.3.0
 
-Adds configurable natural scrolling preferences per input source.
+Adds Chinese localization and a more polished bilingual project homepage.
 
 ## What's included
 
@@ -8,6 +8,8 @@ Adds configurable natural scrolling preferences per input source.
 - Automatic switching between mouse and trackpad natural scrolling preferences.
 - User-selectable natural scrolling preference for mouse input.
 - User-selectable natural scrolling preference for trackpad input.
+- Chinese or English menu text based on the macOS preferred language.
+- Localized status, permission, listener, and natural scrolling state labels.
 - Manual menu controls for mouse mode, trackpad mode, and automatic switching.
 - Local `.app`, `.zip`, and `.dmg` packaging scripts.
 

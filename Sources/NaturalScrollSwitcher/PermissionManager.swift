@@ -10,12 +10,6 @@ struct PermissionState: Equatable {
     var canUseEventTap: Bool {
         listenEventAccess
     }
-
-    var menuTitle: String {
-        let input = listenEventAccess ? "Input OK" : "Input Missing"
-        let accessibility = accessibilityTrusted ? "AX OK" : "AX Missing"
-        return "Permissions: \(input), \(accessibility)"
-    }
 }
 
 enum PermissionManager {

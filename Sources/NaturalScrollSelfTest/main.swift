@@ -84,6 +84,51 @@ do {
         "custom trackpad natural scrolling should be configurable"
     )
 
+    try expectEqual(
+        AppLanguage(preferredLanguages: ["zh-Hans"]),
+        .simplifiedChinese,
+        "zh-Hans should select Simplified Chinese"
+    )
+    try expectEqual(
+        AppLanguage(preferredLanguages: ["zh-CN"]),
+        .simplifiedChinese,
+        "zh-CN should select Simplified Chinese"
+    )
+    try expectEqual(
+        AppLanguage(preferredLanguages: ["en"]),
+        .english,
+        "en should select English"
+    )
+    try expectEqual(
+        AppLanguage(preferredLanguages: ["fr"]),
+        .english,
+        "non-Chinese languages should fall back to English"
+    )
+
+    let chineseLocalizer = AppLocalizer(language: .simplifiedChinese)
+    try expectEqual(
+        chineseLocalizer.automaticSwitching,
+        "自动切换",
+        "Chinese localizer should provide Chinese menu text"
+    )
+    try expectEqual(
+        chineseLocalizer.sourceTitle(.trackpad, naturalScrollEnabled: true),
+        "触控板: 自然滚动开启",
+        "Chinese localizer should format trackpad state"
+    )
+
+    let englishLocalizer = AppLocalizer(language: .english)
+    try expectEqual(
+        englishLocalizer.automaticSwitching,
+        "Automatic Switching",
+        "English localizer should provide English menu text"
+    )
+    try expectEqual(
+        englishLocalizer.sourceTitle(.mouse, naturalScrollEnabled: false),
+        "Mouse: Natural Off",
+        "English localizer should format mouse state"
+    )
+
     print("NaturalScrollSelfTest passed")
 } catch {
     fputs("NaturalScrollSelfTest failed: \(error)\n", stderr)

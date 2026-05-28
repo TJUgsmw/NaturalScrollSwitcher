@@ -2,9 +2,17 @@ import CoreGraphics
 import Foundation
 import NaturalScrollCore
 
+enum EventTapStatus {
+    case eventTapUnavailable
+    case runLoopSourceUnavailable
+    case listening
+    case stopped
+    case reenabled
+}
+
 final class EventTapMonitor {
     var onInputSource: ((InputSource) -> Void)?
-    var onTapMessage: ((String) -> Void)?
+    var onTapStatus: ((EventTapStatus) -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -33,13 +41,13 @@ final class EventTapMonitor {
         )
 
         guard let tap else {
-            onTapMessage?("Event tap unavailable")
+            onTapStatus?(.eventTapUnavailable)
             return false
         }
 
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
             CFMachPortInvalidate(tap)
-            onTapMessage?("Run loop source unavailable")
+            onTapStatus?(.runLoopSourceUnavailable)
             return false
         }
 
@@ -47,7 +55,7 @@ final class EventTapMonitor {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        onTapMessage?("Listening")
+        onTapStatus?(.listening)
         return true
     }
 
@@ -60,7 +68,7 @@ final class EventTapMonitor {
         }
         runLoopSource = nil
         eventTap = nil
-        onTapMessage?("Stopped")
+        onTapStatus?(.stopped)
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
@@ -68,7 +76,7 @@ final class EventTapMonitor {
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
                 DispatchQueue.main.async { [weak self] in
-                    self?.onTapMessage?("Event tap re-enabled")
+                    self?.onTapStatus?(.reenabled)
                 }
             }
             return

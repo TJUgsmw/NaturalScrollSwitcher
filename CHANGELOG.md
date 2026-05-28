@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Added Chinese and English menu localization based on the macOS preferred language.
+- Added localized listener, permission, status, and natural scrolling state text.
+- Refined the GitHub README into a Chinese-first bilingual project homepage.
+
 ## 0.2.0
 
 - Added menu preferences for choosing whether mouse input should enable or disable natural scrolling.

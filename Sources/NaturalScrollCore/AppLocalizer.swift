@@ -1,0 +1,274 @@
+import Foundation
+
+public struct AppLocalizer: Sendable {
+    public let language: AppLanguage
+
+    public init(language: AppLanguage = AppLanguage()) {
+        self.language = language
+    }
+
+    public var unknown: String {
+        switch language {
+        case .english:
+            return "Unknown"
+        case .simplifiedChinese:
+            return "未知"
+        }
+    }
+
+    public var starting: String {
+        switch language {
+        case .english:
+            return "Starting"
+        case .simplifiedChinese:
+            return "正在启动"
+        }
+    }
+
+    public var noSwitchYet: String {
+        switch language {
+        case .english:
+            return "No switch yet"
+        case .simplifiedChinese:
+            return "尚未切换"
+        }
+    }
+
+    public var statusTooltip: String {
+        switch language {
+        case .english:
+            return "NaturalScrollSwitcher"
+        case .simplifiedChinese:
+            return "自然滚动切换器"
+        }
+    }
+
+    public var currentPrefix: String {
+        switch language {
+        case .english:
+            return "Current"
+        case .simplifiedChinese:
+            return "当前模式"
+        }
+    }
+
+    public var systemSettingPrefix: String {
+        switch language {
+        case .english:
+            return "System setting"
+        case .simplifiedChinese:
+            return "系统设置"
+        }
+    }
+
+    public var automaticSwitching: String {
+        switch language {
+        case .english:
+            return "Automatic Switching"
+        case .simplifiedChinese:
+            return "自动切换"
+        }
+    }
+
+    public var mouseNaturalScrolling: String {
+        switch language {
+        case .english:
+            return "Mouse Natural Scrolling"
+        case .simplifiedChinese:
+            return "鼠标自然滚动"
+        }
+    }
+
+    public var trackpadNaturalScrolling: String {
+        switch language {
+        case .english:
+            return "Trackpad Natural Scrolling"
+        case .simplifiedChinese:
+            return "触控板自然滚动"
+        }
+    }
+
+    public var requestPermissions: String {
+        switch language {
+        case .english:
+            return "Request Permissions..."
+        case .simplifiedChinese:
+            return "请求权限..."
+        }
+    }
+
+    public var openInputMonitoringSettings: String {
+        switch language {
+        case .english:
+            return "Open Input Monitoring Settings"
+        case .simplifiedChinese:
+            return "打开输入监控设置"
+        }
+    }
+
+    public var openAccessibilitySettings: String {
+        switch language {
+        case .english:
+            return "Open Accessibility Settings"
+        case .simplifiedChinese:
+            return "打开辅助功能设置"
+        }
+    }
+
+    public var quit: String {
+        switch language {
+        case .english:
+            return "Quit"
+        case .simplifiedChinese:
+            return "退出"
+        }
+    }
+
+    public func sourceName(_ source: InputSource) -> String {
+        switch (language, source) {
+        case (.english, .mouse):
+            return "Mouse"
+        case (.english, .trackpad):
+            return "Trackpad"
+        case (.simplifiedChinese, .mouse):
+            return "鼠标"
+        case (.simplifiedChinese, .trackpad):
+            return "触控板"
+        }
+    }
+
+    public func naturalState(_ enabled: Bool) -> String {
+        switch language {
+        case .english:
+            return enabled ? "Natural On" : "Natural Off"
+        case .simplifiedChinese:
+            return enabled ? "自然滚动开启" : "自然滚动关闭"
+        }
+    }
+
+    public func sourceTitle(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
+        "\(sourceName(source)): \(naturalState(naturalScrollEnabled))"
+    }
+
+    public func switchToSourceTitle(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Switch to \(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        case .simplifiedChinese:
+            return "切换到\(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        }
+    }
+
+    public func permissionsTitle(inputAccess: Bool, accessibilityTrusted: Bool) -> String {
+        switch language {
+        case .english:
+            let input = inputAccess ? "Input OK" : "Input Missing"
+            let accessibility = accessibilityTrusted ? "AX OK" : "AX Missing"
+            return "Permissions: \(input), \(accessibility)"
+        case .simplifiedChinese:
+            let input = inputAccess ? "输入监控已授权" : "输入监控未授权"
+            let accessibility = accessibilityTrusted ? "辅助功能已授权" : "辅助功能未授权"
+            return "权限：\(input)，\(accessibility)"
+        }
+    }
+
+    public func listenerTitle(status: String, writeStatus: String) -> String {
+        switch language {
+        case .english:
+            return "Listener: \(status); \(writeStatus)"
+        case .simplifiedChinese:
+            return "监听：\(status)；\(writeStatus)"
+        }
+    }
+
+    public func alreadyApplied(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Already \(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        case .simplifiedChinese:
+            return "已是\(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        }
+    }
+
+    public func didApply(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Set \(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        case .simplifiedChinese:
+            return "已设置为\(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        }
+    }
+
+    public func writeFailed(observedValue: Bool?) -> String {
+        let observed = observedValue.map(naturalState) ?? unknown
+        switch language {
+        case .english:
+            return "Write failed, observed \(observed)"
+        case .simplifiedChinese:
+            return "写入失败，当前为\(observed)"
+        }
+    }
+
+    public func preferenceChanged(source: InputSource, enabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "\(sourceName(source)) preference: \(naturalState(enabled))"
+        case .simplifiedChinese:
+            return "\(sourceName(source))偏好：\(naturalState(enabled))"
+        }
+    }
+
+    public var eventTapUnavailable: String {
+        switch language {
+        case .english:
+            return "Event tap unavailable"
+        case .simplifiedChinese:
+            return "事件监听不可用"
+        }
+    }
+
+    public var runLoopSourceUnavailable: String {
+        switch language {
+        case .english:
+            return "Run loop source unavailable"
+        case .simplifiedChinese:
+            return "运行循环监听不可用"
+        }
+    }
+
+    public var listening: String {
+        switch language {
+        case .english:
+            return "Listening"
+        case .simplifiedChinese:
+            return "正在监听"
+        }
+    }
+
+    public var stopped: String {
+        switch language {
+        case .english:
+            return "Stopped"
+        case .simplifiedChinese:
+            return "已停止"
+        }
+    }
+
+    public var eventTapReenabled: String {
+        switch language {
+        case .english:
+            return "Event tap re-enabled"
+        case .simplifiedChinese:
+            return "事件监听已恢复"
+        }
+    }
+
+    public var waitingForInputMonitoringPermission: String {
+        switch language {
+        case .english:
+            return "Waiting for Input Monitoring permission"
+        case .simplifiedChinese:
+            return "等待输入监控权限"
+        }
+    }
+}
