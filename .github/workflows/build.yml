@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run self-test
+        run: swift run NaturalScrollSelfTest
+
+      - name: Package release artifacts
+        run: ./scripts/package_release.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NaturalScrollSwitcher-macOS
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/checksums.txt
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/*.zip \
+            dist/*.dmg \
+            dist/checksums.txt \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md
