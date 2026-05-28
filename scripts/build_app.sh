@@ -12,12 +12,14 @@ clear_problem_xattrs() {
 }
 
 cd "$ROOT_DIR"
+python3 "$ROOT_DIR/scripts/generate_assets.py" >/dev/null
 swift build -c release
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$ROOT_DIR/Packaging/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$EXECUTABLE" "$APP_DIR/Contents/MacOS/$APP_NAME"
+cp "$ROOT_DIR/Packaging/Resources/"* "$APP_DIR/Contents/Resources/"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 
 clear_problem_xattrs

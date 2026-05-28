@@ -18,6 +18,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install asset dependencies
+        run: python3 -m pip install --user pillow
+
       - name: Run self-test
         run: swift run NaturalScrollSelfTest
 

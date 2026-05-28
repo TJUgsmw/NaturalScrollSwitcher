@@ -128,6 +128,16 @@ do {
         "Mouse: Natural Off",
         "English localizer should format mouse state"
     )
+    try expectEqual(
+        chineseLocalizer.statusBarTitle(enabled: true),
+        "开",
+        "Chinese status bar title should be compact"
+    )
+    try expectEqual(
+        englishLocalizer.statusBarTitle(enabled: false),
+        "Off",
+        "English status bar title should be compact"
+    )
 
     print("NaturalScrollSelfTest passed")
 } catch {

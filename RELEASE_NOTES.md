@@ -1,9 +1,12 @@
-# NaturalScrollSwitcher 0.3.0
+# NaturalScrollSwitcher 0.4.0
 
-Adds Chinese localization and a more polished bilingual project homepage.
+Adds custom visual identity and a polished drag-to-Applications installer.
 
 ## What's included
 
+- Custom macOS app icon.
+- Template menu bar icon with compact localized status text.
+- Drag-to-Applications DMG with a custom bilingual background.
 - Menu bar app for macOS.
 - Automatic switching between mouse and trackpad natural scrolling preferences.
 - User-selectable natural scrolling preference for mouse input.

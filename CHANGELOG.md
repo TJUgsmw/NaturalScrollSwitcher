@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Added a custom macOS app icon, menu bar template icon, and generated icon resources.
+- Added a polished drag-to-Applications DMG background with app and Applications layout.
+- Updated packaging scripts to regenerate and bundle visual assets automatically.
+
 ## 0.3.0
 
 - Added Chinese and English menu localization based on the macOS preferred language.

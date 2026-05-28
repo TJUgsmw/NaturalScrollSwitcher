@@ -49,8 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureMenu() {
-        statusItem.button?.title = "NS ?"
-        statusItem.button?.toolTip = localizer.statusTooltip
+        configureStatusButton()
 
         [modeItem, systemSettingItem, permissionItem, tapStatusItem].forEach { item in
             item.isEnabled = false
@@ -90,6 +89,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.menu = menu
         updateMenu()
+    }
+
+    private func configureStatusButton() {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        button.title = localizer.statusBarTitle(enabled: nil)
+        button.toolTip = localizer.statusTooltip
+        button.imagePosition = .imageLeading
+        button.imageScaling = .scaleProportionallyDown
+
+        guard let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else {
+            return
+        }
+
+        image.isTemplate = true
+        image.size = NSSize(width: 18, height: 18)
+        button.image = image
     }
 
     private func configureMonitor() {
@@ -201,11 +220,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch lastInputSource {
         case .mouse:
-            statusItem.button?.title = configuration.mouseNaturalScrollEnabled ? "NS On" : "NS Off"
+            statusItem.button?.title = localizer.statusBarTitle(enabled: configuration.mouseNaturalScrollEnabled)
         case .trackpad:
-            statusItem.button?.title = configuration.trackpadNaturalScrollEnabled ? "NS On" : "NS Off"
+            statusItem.button?.title = localizer.statusBarTitle(enabled: configuration.trackpadNaturalScrollEnabled)
         case nil:
-            statusItem.button?.title = preferences.currentValue() == true ? "NS On" : "NS Off"
+            statusItem.button?.title = localizer.statusBarTitle(enabled: preferences.currentValue())
         }
 
         requestPermissionsItem.isHidden = permissionState.canUseEventTap

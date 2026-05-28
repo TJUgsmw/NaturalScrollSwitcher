@@ -43,6 +43,19 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public func statusBarTitle(enabled: Bool?) -> String {
+        guard let enabled else {
+            return "?"
+        }
+
+        switch language {
+        case .english:
+            return enabled ? "On" : "Off"
+        case .simplifiedChinese:
+            return enabled ? "开" : "关"
+        }
+    }
+
     public var currentPrefix: String {
         switch language {
         case .english:
