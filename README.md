@@ -1,11 +1,13 @@
 # NaturalScrollSwitcher
 
-一个本地 macOS 菜单栏小工具：用鼠标滚轮时自动关闭“自然滚动”，用触控板滚动/手势时自动开启“自然滚动”。
+一个本地 macOS 菜单栏小工具：根据你正在用鼠标还是触控板，自动切换 macOS 的“自然滚动”设置。
 
 ## 功能
 
-- 鼠标滚轮输入：设置 macOS 自然滚动为关闭。
-- 触控板连续滚动或手势输入：设置 macOS 自然滚动为开启。
+- 鼠标滚轮输入：按你的鼠标偏好设置自然滚动。
+- 触控板连续滚动或手势输入：按你的触控板偏好设置自然滚动。
+- 默认值仍然是鼠标自然滚动关闭、触控板自然滚动开启。
+- 支持分别选择鼠标和触控板是否开启自然滚动。
 - 菜单栏显示当前状态。
 - 支持暂停自动切换。
 - 支持手动切到鼠标模式或触控板模式。
@@ -19,7 +21,7 @@
 - 普通 USB/蓝牙滚轮鼠标。
 - 本机首次运行需要授予 Input Monitoring/输入监控权限；某些系统环境也可能要求 Accessibility/辅助功能权限。
 
-Magic Mouse 的滚动事件更接近触控设备，v0.1.0 暂不承诺稳定识别。
+Magic Mouse 的滚动事件更接近触控设备，v0.2.0 暂不承诺稳定识别。
 
 ## 安装和运行
 
@@ -43,8 +45,10 @@ open dist/NaturalScrollSwitcher.app
 菜单项说明：
 
 - `Automatic Switching`：启用或暂停自动切换。
-- `Switch to Mouse: Natural Off`：立刻切到鼠标模式。
-- `Switch to Trackpad: Natural On`：立刻切到触控板模式。
+- `Mouse Natural Scrolling`：勾选后，鼠标模式会开启自然滚动；取消勾选则关闭。
+- `Trackpad Natural Scrolling`：勾选后，触控板模式会开启自然滚动；取消勾选则关闭。
+- `Switch to Mouse: Natural On/Off`：立刻按鼠标偏好应用系统设置。
+- `Switch to Trackpad: Natural On/Off`：立刻按触控板偏好应用系统设置。
 - `Open Input Monitoring Settings`：打开输入监控权限设置。
 - `Open Accessibility Settings`：打开辅助功能权限设置。
 
@@ -73,8 +77,8 @@ dist/NaturalScrollSwitcher.app
 会生成：
 
 ```text
-dist/NaturalScrollSwitcher-0.1.0-macos-<arch>.zip
-dist/NaturalScrollSwitcher-0.1.0-macos-<arch>.dmg
+dist/NaturalScrollSwitcher-0.2.0-macos-<arch>.zip
+dist/NaturalScrollSwitcher-0.2.0-macos-<arch>.dmg
 dist/checksums.txt
 ```
 
@@ -88,8 +92,8 @@ dist/checksums.txt
 发布示例：
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 ## 隐私

@@ -57,6 +57,33 @@ do {
         "unknown event should be ignored"
     )
 
+    let defaultConfiguration = NaturalScrollConfiguration()
+    try expectEqual(
+        defaultConfiguration.naturalScrollEnabled(for: .mouse),
+        false,
+        "default mouse natural scrolling should be off"
+    )
+    try expectEqual(
+        defaultConfiguration.naturalScrollEnabled(for: .trackpad),
+        true,
+        "default trackpad natural scrolling should be on"
+    )
+
+    let customConfiguration = NaturalScrollConfiguration(
+        mouseNaturalScrollEnabled: true,
+        trackpadNaturalScrollEnabled: false
+    )
+    try expectEqual(
+        customConfiguration.naturalScrollEnabled(for: .mouse),
+        true,
+        "custom mouse natural scrolling should be configurable"
+    )
+    try expectEqual(
+        customConfiguration.naturalScrollEnabled(for: .trackpad),
+        false,
+        "custom trackpad natural scrolling should be configurable"
+    )
+
     print("NaturalScrollSelfTest passed")
 } catch {
     fputs("NaturalScrollSelfTest failed: \(error)\n", stderr)

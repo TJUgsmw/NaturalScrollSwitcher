@@ -5,6 +5,7 @@ import NaturalScrollCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let preferences = NaturalScrollPreferences()
+    private let settings = AppSettings()
     private let monitor = EventTapMonitor()
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -12,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let modeItem = NSMenuItem(title: "Current: Unknown", action: nil, keyEquivalent: "")
     private let systemSettingItem = NSMenuItem(title: "System setting: Unknown", action: nil, keyEquivalent: "")
     private let autoSwitchItem = NSMenuItem(title: "Automatic Switching", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
+    private let mouseNaturalItem = NSMenuItem(title: "Mouse Natural Scrolling", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
+    private let trackpadNaturalItem = NSMenuItem(title: "Trackpad Natural Scrolling", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
     private let permissionItem = NSMenuItem(title: "Permissions: Checking", action: nil, keyEquivalent: "")
     private let tapStatusItem = NSMenuItem(title: "Listener: Starting", action: nil, keyEquivalent: "")
     private let requestPermissionsItem = NSMenuItem(title: "Request Permissions...", action: #selector(requestPermissions), keyEquivalent: "")
@@ -51,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         for item in [
             autoSwitchItem,
+            mouseNaturalItem,
+            trackpadNaturalItem,
             requestPermissionsItem,
             openInputSettingsItem,
             openAccessibilitySettingsItem,
@@ -67,6 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(tapStatusItem)
         menu.addItem(.separator())
         menu.addItem(autoSwitchItem)
+        menu.addItem(mouseNaturalItem)
+        menu.addItem(trackpadNaturalItem)
+        menu.addItem(.separator())
         menu.addItem(switchMouseItem)
         menu.addItem(switchTrackpadItem)
         menu.addItem(.separator())
@@ -133,10 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let desiredValue = source.naturalScrollEnabled
+        let desiredValue = settings.naturalScrollEnabled(for: source)
+        let sourceTitle = source.menuTitle(naturalScrollEnabled: desiredValue)
         if preferences.currentValue() == desiredValue {
             lastInputSource = source
-            lastWriteStatus = "Already \(source.menuTitle)"
+            lastWriteStatus = "Already \(sourceTitle)"
             updateMenu()
             return
         }
@@ -144,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let result = preferences.setNaturalScrollEnabled(desiredValue)
         if result.succeeded {
             lastInputSource = source
-            lastWriteStatus = "Set \(source.menuTitle)"
+            lastWriteStatus = "Set \(sourceTitle)"
         } else {
             let observed = result.observedValue.map { $0 ? "On" : "Off" } ?? "Unknown"
             lastWriteStatus = "Write failed, observed \(observed)"
@@ -154,18 +163,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenu() {
-        modeItem.title = "Current: \(lastInputSource?.menuTitle ?? "Unknown")"
+        let configuration = settings.configuration
+        let currentModeTitle = lastInputSource.map {
+            $0.menuTitle(naturalScrollEnabled: configuration.naturalScrollEnabled(for: $0))
+        } ?? "Unknown"
+        modeItem.title = "Current: \(currentModeTitle)"
         let systemValue = preferences.currentValue().map { $0 ? "Natural On" : "Natural Off" } ?? "Unknown"
         systemSettingItem.title = "System setting: \(systemValue)"
         permissionItem.title = permissionState.menuTitle
         tapStatusItem.title = "Listener: \(lastTapMessage); \(lastWriteStatus)"
         autoSwitchItem.state = autoSwitchEnabled ? .on : .off
+        mouseNaturalItem.state = configuration.mouseNaturalScrollEnabled ? .on : .off
+        trackpadNaturalItem.state = configuration.trackpadNaturalScrollEnabled ? .on : .off
+        switchMouseItem.title = "Switch to \(InputSource.mouse.menuTitle(naturalScrollEnabled: configuration.mouseNaturalScrollEnabled))"
+        switchTrackpadItem.title = "Switch to \(InputSource.trackpad.menuTitle(naturalScrollEnabled: configuration.trackpadNaturalScrollEnabled))"
 
         switch lastInputSource {
         case .mouse:
-            statusItem.button?.title = "NS Off"
+            statusItem.button?.title = configuration.mouseNaturalScrollEnabled ? "NS On" : "NS Off"
         case .trackpad:
-            statusItem.button?.title = "NS On"
+            statusItem.button?.title = configuration.trackpadNaturalScrollEnabled ? "NS On" : "NS Off"
         case nil:
             statusItem.button?.title = preferences.currentValue() == true ? "NS On" : "NS Off"
         }
@@ -178,6 +195,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleAutomaticSwitching() {
         autoSwitchEnabled.toggle()
         refreshRuntimeState()
+    }
+
+    @objc private func toggleMouseNaturalScrolling() {
+        let enabled = !settings.configuration.mouseNaturalScrollEnabled
+        settings.setNaturalScrollEnabled(enabled, for: .mouse)
+        lastWriteStatus = "Mouse preference: Natural \(enabled ? "On" : "Off")"
+        if lastInputSource == .mouse {
+            apply(source: .mouse, userInitiated: true)
+        } else {
+            updateMenu()
+        }
+    }
+
+    @objc private func toggleTrackpadNaturalScrolling() {
+        let enabled = !settings.configuration.trackpadNaturalScrollEnabled
+        settings.setNaturalScrollEnabled(enabled, for: .trackpad)
+        lastWriteStatus = "Trackpad preference: Natural \(enabled ? "On" : "Off")"
+        if lastInputSource == .trackpad {
+            apply(source: .trackpad, userInitiated: true)
+        } else {
+            updateMenu()
+        }
     }
 
     @objc private func requestPermissions() {

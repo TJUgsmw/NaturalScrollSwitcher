@@ -1,11 +1,13 @@
-# NaturalScrollSwitcher 0.1.0
+# NaturalScrollSwitcher 0.2.0
 
-Initial local release.
+Adds configurable natural scrolling preferences per input source.
 
 ## What's included
 
 - Menu bar app for macOS.
 - Automatic switching between mouse and trackpad natural scrolling preferences.
+- User-selectable natural scrolling preference for mouse input.
+- User-selectable natural scrolling preference for trackpad input.
 - Manual menu controls for mouse mode, trackpad mode, and automatic switching.
 - Local `.app`, `.zip`, and `.dmg` packaging scripts.
 

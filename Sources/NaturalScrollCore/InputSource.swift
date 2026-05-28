@@ -4,30 +4,16 @@ public enum InputSource: String, Equatable, Sendable {
     case mouse
     case trackpad
 
-    public var naturalScrollEnabled: Bool {
+    public var displayName: String {
         switch self {
         case .mouse:
-            return false
+            return "Mouse"
         case .trackpad:
-            return true
+            return "Trackpad"
         }
     }
 
-    public var menuTitle: String {
-        switch self {
-        case .mouse:
-            return "Mouse: Natural Off"
-        case .trackpad:
-            return "Trackpad: Natural On"
-        }
-    }
-
-    public var statusTitle: String {
-        switch self {
-        case .mouse:
-            return "Mouse Off"
-        case .trackpad:
-            return "Trackpad On"
-        }
+    public func menuTitle(naturalScrollEnabled: Bool) -> String {
+        "\(displayName): Natural \(naturalScrollEnabled ? "On" : "Off")"
     }
 }
