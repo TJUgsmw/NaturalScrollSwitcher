@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Changed scrolling reliability strategy to keep the system natural scrolling setting aligned with the trackpad preference.
+- Added event-level correction for ordinary mouse wheel scrolling when the mouse preference differs from the trackpad baseline.
+- Improved scroll source classification so Bluetooth wheel mice are not treated as trackpads only because they report continuous scrolling.
+- Added recent-action diagnostics for corrected mouse scroll, pass-through mouse scroll, and pass-through trackpad scroll.
+- Requires both Input Monitoring and Accessibility permissions for event-level correction.
+
 ## 0.4.0
 
 - Added a custom macOS app icon, menu bar template icon, and generated icon resources.

@@ -36,11 +36,15 @@ do {
 
     try expectEqual(
         ScrollEventClassifier.classify(
-            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
-            isContinuousScroll: true
+            ScrollEventSnapshot(
+                eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+                isContinuousScroll: true,
+                pointDeltaAxis1: 4,
+                scrollPhase: 1
+            )
         ),
         .trackpad,
-        "continuous scroll should be trackpad"
+        "continuous scroll with touch phase should be trackpad"
     )
 
     try expectEqual(
@@ -82,6 +86,52 @@ do {
         customConfiguration.naturalScrollEnabled(for: .trackpad),
         false,
         "custom trackpad natural scrolling should be configurable"
+    )
+
+    let defaultCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1
+        ),
+        configuration: NaturalScrollConfiguration()
+    )
+    try expectEqual(
+        defaultCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: true),
+        "default mouse scrolling should be corrected against the trackpad baseline"
+    )
+
+    let naturalMouseCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: true,
+            trackpadNaturalScrollEnabled: true
+        )
+    )
+    try expectEqual(
+        naturalMouseCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: false),
+        "mouse scrolling should pass through when mouse and trackpad preferences match"
+    )
+
+    let trackpadCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            pointDeltaAxis1: 5,
+            scrollPhase: 2
+        ),
+        configuration: NaturalScrollConfiguration()
+    )
+    try expectEqual(
+        trackpadCorrection,
+        ScrollEventDecision(source: .trackpad, shouldInvertEvent: false),
+        "trackpad scrolling should not be event-corrected"
     )
 
     try expectEqual(

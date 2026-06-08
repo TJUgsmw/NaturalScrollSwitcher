@@ -194,6 +194,15 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public func recentActionTitle(_ action: String) -> String {
+        switch language {
+        case .english:
+            return "Recent action: \(action)"
+        case .simplifiedChinese:
+            return "最近动作：\(action)"
+        }
+    }
+
     public func alreadyApplied(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
         switch language {
         case .english:
@@ -228,6 +237,41 @@ public struct AppLocalizer: Sendable {
             return "\(sourceName(source)) preference: \(naturalState(enabled))"
         case .simplifiedChinese:
             return "\(sourceName(source))偏好：\(naturalState(enabled))"
+        }
+    }
+
+    public func eventAction(source: InputSource, corrected: Bool) -> String {
+        switch (language, source, corrected) {
+        case (.english, .mouse, true):
+            return "Corrected mouse scroll"
+        case (.english, .mouse, false):
+            return "Mouse scroll passed through"
+        case (.english, .trackpad, _):
+            return "Trackpad scroll passed through"
+        case (.simplifiedChinese, .mouse, true):
+            return "已修正鼠标滚动"
+        case (.simplifiedChinese, .mouse, false):
+            return "鼠标滚动未修正"
+        case (.simplifiedChinese, .trackpad, _):
+            return "触控板滚动未修正"
+        }
+    }
+
+    public func trackpadBaselineSynced(enabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Synced trackpad baseline: \(naturalState(enabled))"
+        case .simplifiedChinese:
+            return "已同步触控板基线：\(naturalState(enabled))"
+        }
+    }
+
+    public func trackpadBaselineAlreadySynced(enabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Trackpad baseline already \(naturalState(enabled))"
+        case .simplifiedChinese:
+            return "触控板基线已是\(naturalState(enabled))"
         }
     }
 
@@ -282,6 +326,15 @@ public struct AppLocalizer: Sendable {
             return "Waiting for Input Monitoring permission"
         case .simplifiedChinese:
             return "等待输入监控权限"
+        }
+    }
+
+    public var waitingForRequiredPermissions: String {
+        switch language {
+        case .english:
+            return "Waiting for Input Monitoring and Accessibility permissions"
+        case .simplifiedChinese:
+            return "等待输入监控和辅助功能权限"
         }
     }
 }

@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let trackpadNaturalItem = NSMenuItem(title: "", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
     private let permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let tapStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let actionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let requestPermissionsItem = NSMenuItem(title: "", action: #selector(requestPermissions), keyEquivalent: "")
     private let openInputSettingsItem = NSMenuItem(title: "", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
     private let openAccessibilitySettingsItem = NSMenuItem(title: "", action: #selector(openAccessibilitySettings), keyEquivalent: "")
@@ -30,12 +31,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastInputSource: InputSource?
     private var lastTapMessage = ""
     private var lastWriteStatus = ""
+    private var lastActionStatus = ""
+    private var lastSyncedTrackpadBaseline: Bool?
     private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         lastTapMessage = localizer.starting
         lastWriteStatus = localizer.noSwitchYet
+        lastActionStatus = localizer.noSwitchYet
         configureMenu()
         configureMonitor()
         requestPermissions()
@@ -51,7 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureMenu() {
         configureStatusButton()
 
-        [modeItem, systemSettingItem, permissionItem, tapStatusItem].forEach { item in
+        [modeItem, systemSettingItem, permissionItem, tapStatusItem, actionItem].forEach { item in
             item.isEnabled = false
         }
 
@@ -73,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(systemSettingItem)
         menu.addItem(permissionItem)
         menu.addItem(tapStatusItem)
+        menu.addItem(actionItem)
         menu.addItem(.separator())
         menu.addItem(autoSwitchItem)
         menu.addItem(mouseNaturalItem)
@@ -112,8 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureMonitor() {
-        monitor.onInputSource = { [weak self] source in
-            self?.handleInputSource(source)
+        monitor.onInputEvent = { [weak self] observation in
+            self?.handleInputEvent(observation)
         }
 
         monitor.onTapStatus = { [weak self] status in
@@ -137,15 +142,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let newState = PermissionManager.currentState()
         let changed = newState != permissionState
         permissionState = newState
+        monitor.configuration = settings.configuration
 
         if autoSwitchEnabled && permissionState.canUseEventTap {
             if !monitor.isRunning {
                 _ = monitor.start()
             }
+            syncTrackpadBaselineIfNeeded(force: false)
         } else if monitor.isRunning {
             monitor.stop()
         } else if !permissionState.canUseEventTap {
-            lastTapMessage = localizer.waitingForInputMonitoringPermission
+            lastTapMessage = localizer.waitingForRequiredPermissions
         }
 
         if changed {
@@ -155,35 +162,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func handleInputSource(_ source: InputSource) {
+    private func handleInputEvent(_ observation: ScrollEventObservation) {
         guard autoSwitchEnabled else {
             return
         }
-        apply(source: source, userInitiated: false)
+
+        lastInputSource = observation.source
+        lastActionStatus = localizer.eventAction(
+            source: observation.source,
+            corrected: observation.action == .invertedMouseScroll
+        )
+        syncTrackpadBaselineIfNeeded(force: observation.source == .trackpad)
+
+        updateMenu()
     }
 
-    private func apply(source: InputSource, userInitiated: Bool) {
-        if !userInitiated && lastInputSource == source {
+    private func syncTrackpadBaselineIfNeeded(force: Bool) {
+        let baseline = settings.configuration.trackpadNaturalScrollEnabled
+        guard force || lastSyncedTrackpadBaseline != baseline || preferences.currentValue() != baseline else {
+            lastWriteStatus = localizer.trackpadBaselineAlreadySynced(enabled: baseline)
             return
         }
 
-        let desiredValue = settings.naturalScrollEnabled(for: source)
-        if preferences.currentValue() == desiredValue {
-            lastInputSource = source
-            lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
-            updateMenu()
-            return
-        }
-
-        let result = preferences.setNaturalScrollEnabled(desiredValue)
+        let result = preferences.setNaturalScrollEnabled(baseline)
         if result.succeeded {
-            lastInputSource = source
-            lastWriteStatus = localizer.didApply(source, naturalScrollEnabled: desiredValue)
+            lastSyncedTrackpadBaseline = baseline
+            lastWriteStatus = localizer.trackpadBaselineSynced(enabled: baseline)
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
         }
-
-        updateMenu()
     }
 
     private func updateMenu() {
@@ -199,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accessibilityTrusted: permissionState.accessibilityTrusted
         )
         tapStatusItem.title = localizer.listenerTitle(status: lastTapMessage, writeStatus: lastWriteStatus)
+        actionItem.title = localizer.recentActionTitle(lastActionStatus)
         autoSwitchItem.title = localizer.automaticSwitching
         autoSwitchItem.state = autoSwitchEnabled ? .on : .off
         mouseNaturalItem.title = localizer.mouseNaturalScrolling
@@ -255,9 +263,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleMouseNaturalScrolling() {
         let enabled = !settings.configuration.mouseNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .mouse)
+        monitor.configuration = settings.configuration
         lastWriteStatus = localizer.preferenceChanged(source: .mouse, enabled: enabled)
         if lastInputSource == .mouse {
-            apply(source: .mouse, userInitiated: true)
+            lastActionStatus = localizer.eventAction(
+                source: .mouse,
+                corrected: settings.configuration.mouseNaturalScrollEnabled != settings.configuration.trackpadNaturalScrollEnabled
+            )
+            syncTrackpadBaselineIfNeeded(force: false)
+            updateMenu()
         } else {
             updateMenu()
         }
@@ -266,12 +280,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleTrackpadNaturalScrolling() {
         let enabled = !settings.configuration.trackpadNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .trackpad)
+        monitor.configuration = settings.configuration
         lastWriteStatus = localizer.preferenceChanged(source: .trackpad, enabled: enabled)
-        if lastInputSource == .trackpad {
-            apply(source: .trackpad, userInitiated: true)
-        } else {
-            updateMenu()
-        }
+        syncTrackpadBaselineIfNeeded(force: true)
+        updateMenu()
     }
 
     @objc private func requestPermissions() {
@@ -288,11 +300,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func switchToMouse() {
-        apply(source: .mouse, userInitiated: true)
+        lastInputSource = .mouse
+        lastActionStatus = localizer.eventAction(
+            source: .mouse,
+            corrected: settings.configuration.mouseNaturalScrollEnabled != settings.configuration.trackpadNaturalScrollEnabled
+        )
+        syncTrackpadBaselineIfNeeded(force: false)
+        updateMenu()
     }
 
     @objc private func switchToTrackpad() {
-        apply(source: .trackpad, userInitiated: true)
+        lastInputSource = .trackpad
+        lastActionStatus = localizer.eventAction(source: .trackpad, corrected: false)
+        syncTrackpadBaselineIfNeeded(force: true)
+        updateMenu()
     }
 
     @objc private func quit() {

@@ -10,8 +10,19 @@ enum EventTapStatus {
     case reenabled
 }
 
+enum ScrollEventAction {
+    case passedThrough
+    case invertedMouseScroll
+}
+
+struct ScrollEventObservation {
+    let source: InputSource
+    let action: ScrollEventAction
+}
+
 final class EventTapMonitor {
-    var onInputSource: ((InputSource) -> Void)?
+    var configuration = NaturalScrollConfiguration()
+    var onInputEvent: ((ScrollEventObservation) -> Void)?
     var onTapStatus: ((EventTapStatus) -> Void)?
 
     private var eventTap: CFMachPort?
@@ -33,8 +44,8 @@ final class EventTapMonitor {
 
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
-            place: .tailAppendEventTap,
-            options: .listenOnly,
+            place: .headInsertEventTap,
+            options: .defaultTap,
             eventsOfInterest: mask,
             callback: EventTapMonitor.eventTapCallback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -71,7 +82,7 @@ final class EventTapMonitor {
         onTapStatus?(.stopped)
     }
 
-    private func handle(type: CGEventType, event: CGEvent) {
+    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
@@ -79,22 +90,73 @@ final class EventTapMonitor {
                     self?.onTapStatus?(.reenabled)
                 }
             }
-            return
+            return Unmanaged.passUnretained(event)
         }
 
-        let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
-        let source = ScrollEventClassifier.classify(
-            eventTypeRawValue: Int64(type.rawValue),
-            isContinuousScroll: type == .scrollWheel ? continuous : nil
-        )
+        let snapshot = makeSnapshot(type: type, event: event)
+        guard let decision = ScrollEventClassifier.decision(
+            for: snapshot,
+            configuration: configuration
+        ) else {
+            return Unmanaged.passUnretained(event)
+        }
 
-        guard let source else {
-            return
+        let action: ScrollEventAction
+        if decision.shouldInvertEvent {
+            invertScrollEvent(event)
+            action = .invertedMouseScroll
+        } else {
+            action = .passedThrough
         }
 
         DispatchQueue.main.async { [weak self] in
-            self?.onInputSource?(source)
+            self?.onInputEvent?(
+                ScrollEventObservation(
+                    source: decision.source,
+                    action: action
+                )
+            )
         }
+
+        return Unmanaged.passUnretained(event)
+    }
+
+    private func makeSnapshot(type: CGEventType, event: CGEvent) -> ScrollEventSnapshot {
+        ScrollEventSnapshot(
+            eventTypeRawValue: Int64(type.rawValue),
+            isContinuousScroll: type == .scrollWheel ? event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 : nil,
+            deltaAxis1: event.getIntegerValueField(.scrollWheelEventDeltaAxis1),
+            deltaAxis2: event.getIntegerValueField(.scrollWheelEventDeltaAxis2),
+            deltaAxis3: event.getIntegerValueField(.scrollWheelEventDeltaAxis3),
+            fixedPointDeltaAxis1: event.getIntegerValueField(.scrollWheelEventFixedPtDeltaAxis1),
+            fixedPointDeltaAxis2: event.getIntegerValueField(.scrollWheelEventFixedPtDeltaAxis2),
+            fixedPointDeltaAxis3: event.getIntegerValueField(.scrollWheelEventFixedPtDeltaAxis3),
+            pointDeltaAxis1: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1),
+            pointDeltaAxis2: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2),
+            pointDeltaAxis3: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis3),
+            scrollPhase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
+            momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase)
+        )
+    }
+
+    private func invertScrollEvent(_ event: CGEvent) {
+        invertIntegerField(.scrollWheelEventDeltaAxis1, on: event)
+        invertIntegerField(.scrollWheelEventDeltaAxis2, on: event)
+        invertIntegerField(.scrollWheelEventDeltaAxis3, on: event)
+        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis1, on: event)
+        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis2, on: event)
+        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis3, on: event)
+        invertIntegerField(.scrollWheelEventPointDeltaAxis1, on: event)
+        invertIntegerField(.scrollWheelEventPointDeltaAxis2, on: event)
+        invertIntegerField(.scrollWheelEventPointDeltaAxis3, on: event)
+    }
+
+    private func invertIntegerField(_ field: CGEventField, on event: CGEvent) {
+        let value = event.getIntegerValueField(field)
+        guard value != 0 else {
+            return
+        }
+        event.setIntegerValueField(field, value: -value)
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in
@@ -103,7 +165,6 @@ final class EventTapMonitor {
         }
 
         let monitor = Unmanaged<EventTapMonitor>.fromOpaque(userInfo).takeUnretainedValue()
-        monitor.handle(type: type, event: event)
-        return Unmanaged.passUnretained(event)
+        return monitor.handle(type: type, event: event)
     }
 }
