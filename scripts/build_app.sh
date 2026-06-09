@@ -8,7 +8,10 @@ EXECUTABLE="$ROOT_DIR/.build/release/$APP_NAME"
 
 clear_problem_xattrs() {
     xattr -cr "$APP_DIR" 2>/dev/null || true
-    xattr -d com.apple.FinderInfo "$APP_DIR" 2>/dev/null || true
+    while IFS= read -r -d '' item; do
+        xattr -d com.apple.FinderInfo "$item" 2>/dev/null || true
+        xattr -d com.apple.ResourceFork "$item" 2>/dev/null || true
+    done < <(find "$APP_DIR" -print0)
 }
 
 cd "$ROOT_DIR"

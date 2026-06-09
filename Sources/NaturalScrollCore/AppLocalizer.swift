@@ -74,6 +74,15 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public var runModePrefix: String {
+        switch language {
+        case .english:
+            return "Run mode"
+        case .simplifiedChinese:
+            return "运行模式"
+        }
+    }
+
     public var automaticSwitching: String {
         switch language {
         case .english:
@@ -203,6 +212,23 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public func runModeTitle(_ mode: NaturalScrollRunMode) -> String {
+        switch (language, mode) {
+        case (.english, .eventCorrection):
+            return "Event Correction"
+        case (.english, .globalFallback):
+            return "Global Fallback"
+        case (.english, .manualOnly):
+            return "Manual Only"
+        case (.simplifiedChinese, .eventCorrection):
+            return "事件修正"
+        case (.simplifiedChinese, .globalFallback):
+            return "全局设置回退"
+        case (.simplifiedChinese, .manualOnly):
+            return "仅手动"
+        }
+    }
+
     public func alreadyApplied(_ source: InputSource, naturalScrollEnabled: Bool) -> String {
         switch language {
         case .english:
@@ -218,6 +244,15 @@ public struct AppLocalizer: Sendable {
             return "Set \(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
         case .simplifiedChinese:
             return "已设置为\(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        }
+    }
+
+    public func didWriteSystemSetting(source: InputSource, naturalScrollEnabled: Bool) -> String {
+        switch language {
+        case .english:
+            return "Wrote system setting for \(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))"
+        case .simplifiedChinese:
+            return "已按\(sourceTitle(source, naturalScrollEnabled: naturalScrollEnabled))写入系统设置"
         }
     }
 
@@ -255,6 +290,10 @@ public struct AppLocalizer: Sendable {
         case (.simplifiedChinese, .trackpad, _):
             return "触控板滚动未修正"
         }
+    }
+
+    public func passThroughAction(source: InputSource) -> String {
+        eventAction(source: source, corrected: false)
     }
 
     public func trackpadBaselineSynced(enabled: Bool) -> String {
@@ -302,6 +341,15 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public func listening(mode: NaturalScrollRunMode) -> String {
+        switch language {
+        case .english:
+            return "Listening: \(runModeTitle(mode))"
+        case .simplifiedChinese:
+            return "正在监听：\(runModeTitle(mode))"
+        }
+    }
+
     public var stopped: String {
         switch language {
         case .english:
@@ -335,6 +383,24 @@ public struct AppLocalizer: Sendable {
             return "Waiting for Input Monitoring and Accessibility permissions"
         case .simplifiedChinese:
             return "等待输入监控和辅助功能权限"
+        }
+    }
+
+    public var waitingForAutoDetectionPermission: String {
+        switch language {
+        case .english:
+            return "Waiting for Input Monitoring permission"
+        case .simplifiedChinese:
+            return "等待输入监控权限"
+        }
+    }
+
+    public var eventCorrectionUnavailableUsingFallback: String {
+        switch language {
+        case .english:
+            return "Event correction unavailable; using global fallback"
+        case .simplifiedChinese:
+            return "事件修正不可用，使用全局设置回退"
         }
     }
 }

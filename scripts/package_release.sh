@@ -13,21 +13,45 @@ CHECKSUMS_PATH="$DIST_DIR/checksums.txt"
 RW_DMG_PATH="$DIST_DIR/$APP_NAME-$VERSION-rw.dmg"
 MOUNT_DIR="$DIST_DIR/dmg-mount"
 VOLUME_NAME="$APP_NAME $VERSION"
+STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/NaturalScrollSwitcherRelease.XXXXXX")"
+STAGED_APP_DIR="$STAGING_DIR/$APP_NAME.app"
 
 clear_problem_xattrs() {
-    xattr -cr "$APP_DIR" 2>/dev/null || true
-    xattr -d com.apple.FinderInfo "$APP_DIR" 2>/dev/null || true
+    local target="${1:-$APP_DIR}"
+    xattr -cr "$target" 2>/dev/null || true
+    while IFS= read -r -d '' item; do
+        xattr -d com.apple.FinderInfo "$item" 2>/dev/null || true
+        xattr -d com.apple.ResourceFork "$item" 2>/dev/null || true
+    done < <(find "$target" -print0)
+}
+
+verify_clean_signature() {
+    local target="${1:-$APP_DIR}"
+    local attempt
+    for attempt in 1 2 3 4 5 6 7 8; do
+        clear_problem_xattrs "$target"
+        if codesign --verify --deep --strict "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.5
+    done
+
+    clear_problem_xattrs "$target"
+    codesign --verify --deep --strict "$target"
 }
 
 "$ROOT_DIR/scripts/build_app.sh" >/dev/null
 
+rm -rf "$STAGED_APP_DIR"
+ditto --norsrc "$APP_DIR" "$STAGED_APP_DIR"
+verify_clean_signature "$STAGED_APP_DIR"
+
 rm -f "$ZIP_PATH" "$DMG_PATH" "$CHECKSUMS_PATH" "$RW_DMG_PATH"
 rm -rf "$MOUNT_DIR"
-clear_problem_xattrs
 
 (
-    cd "$DIST_DIR"
-    ditto -c -k --keepParent "$APP_NAME.app" "$(basename "$ZIP_PATH")"
+    cd "$STAGING_DIR"
+    ditto -c -k --norsrc --keepParent "$APP_NAME.app" "$ZIP_PATH"
 )
 
 mkdir -p "$MOUNT_DIR"
@@ -48,10 +72,11 @@ hdiutil attach \
 cleanup_mount() {
     hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
     rm -rf "$MOUNT_DIR"
+    rm -rf "$STAGING_DIR"
 }
 trap cleanup_mount EXIT
 
-cp -R "$APP_DIR" "$MOUNT_DIR/$APP_NAME.app"
+ditto --norsrc "$STAGED_APP_DIR" "$MOUNT_DIR/$APP_NAME.app"
 ln -s /Applications "$MOUNT_DIR/Applications"
 mkdir -p "$MOUNT_DIR/.background"
 cp "$ROOT_DIR/Packaging/Resources/DMGBackground.png" "$MOUNT_DIR/.background/DMGBackground.png"
@@ -89,8 +114,16 @@ hdiutil convert \
     -o "$DMG_PATH" >/dev/null
 rm -f "$RW_DMG_PATH"
 
-clear_problem_xattrs
+sleep 1
+verify_clean_signature "$STAGED_APP_DIR"
+
 shasum -a 256 "$ZIP_PATH" "$DMG_PATH" > "$CHECKSUMS_PATH"
+verify_clean_signature "$STAGED_APP_DIR"
+
+rm -rf "$APP_DIR"
+ditto --norsrc "$STAGED_APP_DIR" "$APP_DIR"
+clear_problem_xattrs "$APP_DIR"
+rm -rf "$STAGING_DIR"
 
 echo "Created:"
 echo "  $ZIP_PATH"

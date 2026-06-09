@@ -5,7 +5,7 @@ import NaturalScrollCore
 enum EventTapStatus {
     case eventTapUnavailable
     case runLoopSourceUnavailable
-    case listening
+    case listening(NaturalScrollRunMode)
     case stopped
     case reenabled
 }
@@ -27,31 +27,37 @@ final class EventTapMonitor {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private(set) var activeRunMode: NaturalScrollRunMode?
+    private var requestedRunMode: NaturalScrollRunMode?
 
     var isRunning: Bool {
         eventTap != nil
     }
 
     @discardableResult
-    func start() -> Bool {
-        if isRunning {
+    func start(preferredRunMode: NaturalScrollRunMode) -> Bool {
+        guard preferredRunMode != .manualOnly else {
+            stop()
+            return false
+        }
+
+        if isRunning && requestedRunMode == preferredRunMode {
             return true
         }
+
+        if isRunning {
+            stop()
+        }
+        requestedRunMode = preferredRunMode
 
         let scrollMask = CGEventMask(1) << CGEventType.scrollWheel.rawValue
         let gestureMask = CGEventMask(1) << UInt64(ScrollEventClassifier.gestureEventTypeRawValue)
         let mask = scrollMask | gestureMask
 
-        let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: EventTapMonitor.eventTapCallback,
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        )
+        let tapAndMode = makeTap(preferredRunMode: preferredRunMode, mask: mask)
 
-        guard let tap else {
+        guard let tap = tapAndMode.tap else {
+            activeRunMode = nil
             onTapStatus?(.eventTapUnavailable)
             return false
         }
@@ -63,11 +69,43 @@ final class EventTapMonitor {
         }
 
         eventTap = tap
+        activeRunMode = tapAndMode.mode
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        onTapStatus?(.listening)
+        onTapStatus?(.listening(tapAndMode.mode))
         return true
+    }
+
+    private func makeTap(
+        preferredRunMode: NaturalScrollRunMode,
+        mask: CGEventMask
+    ) -> (tap: CFMachPort?, mode: NaturalScrollRunMode) {
+        if preferredRunMode == .eventCorrection {
+            let editableTap = createTap(options: .defaultTap, mask: mask)
+            if let editableTap {
+                return (editableTap, .eventCorrection)
+            }
+        }
+
+        return (
+            createTap(options: .listenOnly, mask: mask),
+            .globalFallback
+        )
+    }
+
+    private func createTap(
+        options: CGEventTapOptions,
+        mask: CGEventMask
+    ) -> CFMachPort? {
+        CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: options,
+            eventsOfInterest: mask,
+            callback: EventTapMonitor.eventTapCallback,
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        )
     }
 
     func stop() {
@@ -79,6 +117,8 @@ final class EventTapMonitor {
         }
         runLoopSource = nil
         eventTap = nil
+        activeRunMode = nil
+        requestedRunMode = nil
         onTapStatus?(.stopped)
     }
 
@@ -102,7 +142,7 @@ final class EventTapMonitor {
         }
 
         let action: ScrollEventAction
-        if decision.shouldInvertEvent {
+        if activeRunMode == .eventCorrection && decision.shouldInvertEvent {
             invertScrollEvent(event)
             action = .invertedMouseScroll
         } else {

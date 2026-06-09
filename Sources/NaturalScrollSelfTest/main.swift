@@ -135,6 +135,39 @@ do {
     )
 
     try expectEqual(
+        NaturalScrollRunMode.resolve(
+            inputMonitoringAllowed: true,
+            accessibilityTrusted: true
+        ),
+        .eventCorrection,
+        "full permissions should enable event correction"
+    )
+    try expectEqual(
+        NaturalScrollRunMode.resolve(
+            inputMonitoringAllowed: true,
+            accessibilityTrusted: false
+        ),
+        .globalFallback,
+        "input monitoring without accessibility should use global fallback"
+    )
+    try expectEqual(
+        NaturalScrollRunMode.resolve(
+            inputMonitoringAllowed: false,
+            accessibilityTrusted: true
+        ),
+        .manualOnly,
+        "missing input monitoring should use manual only mode"
+    )
+    try expectEqual(
+        NaturalScrollRunMode.resolve(
+            inputMonitoringAllowed: false,
+            accessibilityTrusted: false
+        ),
+        .manualOnly,
+        "missing input monitoring and accessibility should use manual only mode"
+    )
+
+    try expectEqual(
         AppLanguage(preferredLanguages: ["zh-Hans"]),
         .simplifiedChinese,
         "zh-Hans should select Simplified Chinese"
@@ -184,9 +217,19 @@ do {
         "Chinese status bar title should be compact"
     )
     try expectEqual(
+        chineseLocalizer.runModeTitle(.globalFallback),
+        "全局设置回退",
+        "Chinese localizer should name the fallback run mode"
+    )
+    try expectEqual(
         englishLocalizer.statusBarTitle(enabled: false),
         "Off",
         "English status bar title should be compact"
+    )
+    try expectEqual(
+        englishLocalizer.runModeTitle(.eventCorrection),
+        "Event Correction",
+        "English localizer should name the event correction run mode"
     )
 
     print("NaturalScrollSelfTest passed")

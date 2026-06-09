@@ -8,6 +8,10 @@ struct PermissionState: Equatable {
     let accessibilityTrusted: Bool
 
     var canUseEventTap: Bool {
+        listenEventAccess
+    }
+
+    var allPermissionsGranted: Bool {
         listenEventAccess && accessibilityTrusted
     }
 }

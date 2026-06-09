@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
     private let modeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let runModeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let systemSettingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let autoSwitchItem = NSMenuItem(title: "", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
     private let mouseNaturalItem = NSMenuItem(title: "", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
@@ -32,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastTapMessage = ""
     private var lastWriteStatus = ""
     private var lastActionStatus = ""
+    private var activeRunMode: NaturalScrollRunMode = .manualOnly
     private var lastSyncedTrackpadBaseline: Bool?
     private var permissionTimer: Timer?
 
@@ -55,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureMenu() {
         configureStatusButton()
 
-        [modeItem, systemSettingItem, permissionItem, tapStatusItem, actionItem].forEach { item in
+        [modeItem, runModeItem, systemSettingItem, permissionItem, tapStatusItem, actionItem].forEach { item in
             item.isEnabled = false
         }
 
@@ -74,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(modeItem)
+        menu.addItem(runModeItem)
         menu.addItem(systemSettingItem)
         menu.addItem(permissionItem)
         menu.addItem(tapStatusItem)
@@ -125,6 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else {
                 return
             }
+            if case let .listening(mode) = status {
+                self.activeRunMode = mode
+            }
             self.lastTapMessage = self.localizedTapStatus(status)
             self.updateMenu()
         }
@@ -143,16 +149,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let changed = newState != permissionState
         permissionState = newState
         monitor.configuration = settings.configuration
+        let desiredRunMode = NaturalScrollRunMode.resolve(
+            inputMonitoringAllowed: permissionState.listenEventAccess,
+            accessibilityTrusted: permissionState.accessibilityTrusted
+        )
 
-        if autoSwitchEnabled && permissionState.canUseEventTap {
+        if autoSwitchEnabled && desiredRunMode != .manualOnly {
+            var monitorStarted = monitor.isRunning
             if !monitor.isRunning {
-                _ = monitor.start()
+                monitorStarted = monitor.start(preferredRunMode: desiredRunMode)
+            } else {
+                let usingFallbackForRejectedEditableTap = desiredRunMode == .eventCorrection &&
+                    monitor.activeRunMode == .globalFallback
+                let shouldRestart = monitor.activeRunMode != desiredRunMode &&
+                    (!usingFallbackForRejectedEditableTap || changed)
+                if shouldRestart {
+                    monitorStarted = monitor.start(preferredRunMode: desiredRunMode)
+                }
             }
-            syncTrackpadBaselineIfNeeded(force: false)
+
+            guard monitorStarted else {
+                activeRunMode = .manualOnly
+                updateMenu()
+                return
+            }
+
+            activeRunMode = monitor.activeRunMode ?? desiredRunMode
+            if activeRunMode == .eventCorrection {
+                syncTrackpadBaselineIfNeeded(force: false)
+            } else if activeRunMode == .globalFallback && desiredRunMode == .eventCorrection {
+                lastTapMessage = localizer.eventCorrectionUnavailableUsingFallback
+            }
         } else if monitor.isRunning {
             monitor.stop()
+            activeRunMode = .manualOnly
         } else if !permissionState.canUseEventTap {
-            lastTapMessage = localizer.waitingForRequiredPermissions
+            activeRunMode = .manualOnly
+            lastTapMessage = localizer.waitingForAutoDetectionPermission
+        } else {
+            activeRunMode = .manualOnly
         }
 
         if changed {
@@ -172,9 +207,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             source: observation.source,
             corrected: observation.action == .invertedMouseScroll
         )
-        syncTrackpadBaselineIfNeeded(force: observation.source == .trackpad)
+        switch activeRunMode {
+        case .eventCorrection:
+            syncTrackpadBaselineIfNeeded(force: observation.source == .trackpad)
+        case .globalFallback:
+            applySystemSetting(for: observation.source)
+        case .manualOnly:
+            break
+        }
 
         updateMenu()
+    }
+
+    private func applySystemSetting(for source: InputSource) {
+        let desiredValue = settings.naturalScrollEnabled(for: source)
+        if preferences.currentValue() == desiredValue {
+            lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
+            lastActionStatus = localizer.passThroughAction(source: source)
+            return
+        }
+
+        let result = preferences.setNaturalScrollEnabled(desiredValue)
+        if result.succeeded {
+            lastWriteStatus = localizer.didApply(source, naturalScrollEnabled: desiredValue)
+            lastActionStatus = localizer.didWriteSystemSetting(
+                source: source,
+                naturalScrollEnabled: desiredValue
+            )
+        } else {
+            lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
+        }
     }
 
     private func syncTrackpadBaselineIfNeeded(force: Bool) {
@@ -199,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             localizer.sourceTitle($0, naturalScrollEnabled: configuration.naturalScrollEnabled(for: $0))
         } ?? localizer.unknown
         modeItem.title = "\(localizer.currentPrefix): \(currentModeTitle)"
+        runModeItem.title = "\(localizer.runModePrefix): \(localizer.runModeTitle(activeRunMode))"
         let systemValue = preferences.currentValue().map(localizer.naturalState) ?? localizer.unknown
         systemSettingItem.title = "\(localizer.systemSettingPrefix): \(systemValue)"
         permissionItem.title = localizer.permissionsTitle(
@@ -235,7 +298,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = localizer.statusBarTitle(enabled: preferences.currentValue())
         }
 
-        requestPermissionsItem.isHidden = permissionState.canUseEventTap
+        requestPermissionsItem.isHidden = permissionState.allPermissionsGranted
         openInputSettingsItem.isHidden = permissionState.listenEventAccess
         openAccessibilitySettingsItem.isHidden = permissionState.accessibilityTrusted
     }
@@ -246,8 +309,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return localizer.eventTapUnavailable
         case .runLoopSourceUnavailable:
             return localizer.runLoopSourceUnavailable
-        case .listening:
-            return localizer.listening
+        case let .listening(mode):
+            return localizer.listening(mode: mode)
         case .stopped:
             return localizer.stopped
         case .reenabled:
@@ -265,7 +328,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.setNaturalScrollEnabled(enabled, for: .mouse)
         monitor.configuration = settings.configuration
         lastWriteStatus = localizer.preferenceChanged(source: .mouse, enabled: enabled)
-        if lastInputSource == .mouse {
+        if activeRunMode == .globalFallback && lastInputSource == .mouse {
+            applySystemSetting(for: .mouse)
+            updateMenu()
+        } else if activeRunMode == .eventCorrection && lastInputSource == .mouse {
             lastActionStatus = localizer.eventAction(
                 source: .mouse,
                 corrected: settings.configuration.mouseNaturalScrollEnabled != settings.configuration.trackpadNaturalScrollEnabled
@@ -282,7 +348,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.setNaturalScrollEnabled(enabled, for: .trackpad)
         monitor.configuration = settings.configuration
         lastWriteStatus = localizer.preferenceChanged(source: .trackpad, enabled: enabled)
-        syncTrackpadBaselineIfNeeded(force: true)
+        if activeRunMode == .eventCorrection {
+            syncTrackpadBaselineIfNeeded(force: true)
+        } else if activeRunMode == .globalFallback && lastInputSource == .trackpad {
+            applySystemSetting(for: .trackpad)
+        }
         updateMenu()
     }
 
@@ -301,18 +371,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func switchToMouse() {
         lastInputSource = .mouse
-        lastActionStatus = localizer.eventAction(
-            source: .mouse,
-            corrected: settings.configuration.mouseNaturalScrollEnabled != settings.configuration.trackpadNaturalScrollEnabled
-        )
-        syncTrackpadBaselineIfNeeded(force: false)
+        applySystemSetting(for: .mouse)
         updateMenu()
     }
 
     @objc private func switchToTrackpad() {
         lastInputSource = .trackpad
-        lastActionStatus = localizer.eventAction(source: .trackpad, corrected: false)
-        syncTrackpadBaselineIfNeeded(force: true)
+        applySystemSetting(for: .trackpad)
         updateMenu()
     }
 

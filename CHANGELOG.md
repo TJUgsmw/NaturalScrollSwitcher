@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Added runtime fallback modes: Event Correction, Global Fallback, and Manual Only.
+- Event taps now try editable correction first and automatically fall back to listen-only global setting sync when Accessibility permission is missing or macOS rejects the editable tap.
+- Manual mouse and trackpad menu actions now always write the selected system natural scrolling setting.
+- Improved menu diagnostics for run mode, recent input source, recent action, and permission state.
+- Clarified permission guidance so missing Accessibility permission no longer makes the app appear silently broken.
+
 ## 0.5.0
 
 - Changed scrolling reliability strategy to keep the system natural scrolling setting aligned with the trackpad preference.
