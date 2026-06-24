@@ -1,9 +1,11 @@
-# NaturalScrollSwitcher 0.6.1
+# NaturalScrollSwitcher 0.6.2
 
-Patch release for trackpad switching after the v0.6.0 mouse detection changes.
+Patch release for GitHub Actions packaging and the recent trackpad switching fix.
 
 ## What's included
 
+- GitHub Actions now installs Pillow in a project-local Python virtual environment instead of using `pip install --user`.
+- This avoids PEP 668 `externally-managed-environment` failures on newer macOS runners.
 - Fixes an over-broad mouse heuristic that could make touch-phase trackpad scroll events look like mouse wheel input.
 - Reduces the recent HID mouse override window so switching from mouse to trackpad is less likely to affect the first trackpad scroll.
 - The app no longer requests permissions on every launch; it only reads current permission state unless you click the permission menu item.

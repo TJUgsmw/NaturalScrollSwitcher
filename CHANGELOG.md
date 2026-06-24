@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- Fixed GitHub Actions dependency installation by using a project-local Python virtual environment for Pillow.
+- Updated build instructions to avoid PEP 668 `externally-managed-environment` failures on newer macOS runners.
+
 ## 0.6.1
 
 - Fixed an over-broad mouse heuristic that could classify touch-phase trackpad scroll events as mouse wheel input.
