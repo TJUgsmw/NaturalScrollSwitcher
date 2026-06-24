@@ -143,6 +143,42 @@ do {
         "default mouse scrolling should be corrected against the trackpad baseline"
     )
 
+    let alreadySyncedMouseCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: false,
+            trackpadNaturalScrollEnabled: true,
+            systemNaturalScrollEnabled: false
+        )
+    )
+    try expectEqual(
+        alreadySyncedMouseCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: false),
+        "mouse scrolling should pass through once the system setting already matches the mouse preference"
+    )
+
+    let pendingMouseCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: false,
+            trackpadNaturalScrollEnabled: true,
+            systemNaturalScrollEnabled: true
+        )
+    )
+    try expectEqual(
+        pendingMouseCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: true),
+        "mouse scrolling should be corrected while the system setting is still on the trackpad preference"
+    )
+
     let naturalMouseCorrection = ScrollEventClassifier.decision(
         for: ScrollEventSnapshot(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,

@@ -1,9 +1,13 @@
-# NaturalScrollSwitcher 0.6.2
+# NaturalScrollSwitcher 0.6.3
 
-Patch release for GitHub Actions packaging and the recent trackpad switching fix.
+Patch release restoring the original visible system-setting behavior while keeping event-level correction as a transition aid.
 
 ## What's included
 
+- Mouse input now writes the macOS natural scrolling setting to the mouse preference.
+- Trackpad input now writes the macOS natural scrolling setting to the trackpad preference.
+- Event-level correction is only used while the current system setting has not caught up to the detected mouse preference.
+- This avoids double-inverting mouse wheel events once the system setting already matches the mouse preference.
 - GitHub Actions now installs Pillow in a project-local Python virtual environment instead of using `pip install --user`.
 - This avoids PEP 668 `externally-managed-environment` failures on newer macOS runners.
 - Fixes an over-broad mouse heuristic that could make touch-phase trackpad scroll events look like mouse wheel input.

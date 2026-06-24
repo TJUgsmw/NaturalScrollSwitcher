@@ -147,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let newState = PermissionManager.currentState()
         let changed = newState != permissionState
         permissionState = newState
-        monitor.configuration = settings.configuration
+        refreshMonitorConfiguration()
         let desiredRunMode = NaturalScrollRunMode.resolve(
             inputMonitoringAllowed: permissionState.listenEventAccess,
             accessibilityTrusted: permissionState.accessibilityTrusted
@@ -174,9 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             activeRunMode = monitor.activeRunMode ?? desiredRunMode
-            if activeRunMode == .eventCorrection {
-                syncTrackpadBaselineIfNeeded(force: false)
-            } else if activeRunMode == .globalFallback && desiredRunMode == .eventCorrection {
+            if activeRunMode == .globalFallback && desiredRunMode == .eventCorrection {
                 lastTapMessage = localizer.eventCorrectionUnavailableUsingFallback
             }
         } else if monitor.isRunning {
@@ -208,7 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         switch activeRunMode {
         case .eventCorrection:
-            syncTrackpadBaselineIfNeeded(force: observation.source == .trackpad)
+            applySystemSetting(for: observation.source)
         case .globalFallback:
             applySystemSetting(for: observation.source)
         case .manualOnly:
@@ -223,11 +221,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if preferences.currentValue() == desiredValue {
             lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
             lastActionStatus = localizer.passThroughAction(source: source)
+            refreshMonitorConfiguration()
             return
         }
 
         let result = preferences.setNaturalScrollEnabled(desiredValue)
         if result.succeeded {
+            refreshMonitorConfiguration()
             lastWriteStatus = localizer.didApply(source, naturalScrollEnabled: desiredValue)
             lastActionStatus = localizer.didWriteSystemSetting(
                 source: source,
@@ -252,6 +252,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
         }
+    }
+
+    private func refreshMonitorConfiguration() {
+        var configuration = settings.configuration
+        configuration.systemNaturalScrollEnabled = preferences.currentValue()
+        monitor.configuration = configuration
     }
 
     private func updateMenu() {
@@ -325,17 +331,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleMouseNaturalScrolling() {
         let enabled = !settings.configuration.mouseNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .mouse)
-        monitor.configuration = settings.configuration
+        refreshMonitorConfiguration()
         lastWriteStatus = localizer.preferenceChanged(source: .mouse, enabled: enabled)
-        if activeRunMode == .globalFallback && lastInputSource == .mouse {
+        if lastInputSource == .mouse {
             applySystemSetting(for: .mouse)
-            updateMenu()
-        } else if activeRunMode == .eventCorrection && lastInputSource == .mouse {
-            lastActionStatus = localizer.eventAction(
-                source: .mouse,
-                corrected: settings.configuration.mouseNaturalScrollEnabled != settings.configuration.trackpadNaturalScrollEnabled
-            )
-            syncTrackpadBaselineIfNeeded(force: false)
             updateMenu()
         } else {
             updateMenu()
@@ -345,11 +344,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleTrackpadNaturalScrolling() {
         let enabled = !settings.configuration.trackpadNaturalScrollEnabled
         settings.setNaturalScrollEnabled(enabled, for: .trackpad)
-        monitor.configuration = settings.configuration
+        refreshMonitorConfiguration()
         lastWriteStatus = localizer.preferenceChanged(source: .trackpad, enabled: enabled)
-        if activeRunMode == .eventCorrection {
-            syncTrackpadBaselineIfNeeded(force: true)
-        } else if activeRunMode == .globalFallback && lastInputSource == .trackpad {
+        if lastInputSource == .trackpad {
             applySystemSetting(for: .trackpad)
         }
         updateMenu()

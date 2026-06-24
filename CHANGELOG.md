@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3
+
+- Restored the original behavior where the macOS global natural scrolling setting follows the active input source: mouse writes the mouse preference, trackpad writes the trackpad preference.
+- Kept event-level correction only as a transition aid while the current system setting has not yet caught up to the detected mouse preference.
+- Avoided double-inverting mouse wheel events once the system setting already matches the mouse preference.
+
 ## 0.6.2
 
 - Fixed GitHub Actions dependency installation by using a project-local Python virtual environment for Pillow.
