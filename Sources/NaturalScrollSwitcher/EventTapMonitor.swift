@@ -25,6 +25,7 @@ final class EventTapMonitor {
     var onInputEvent: ((ScrollEventObservation) -> Void)?
     var onTapStatus: ((EventTapStatus) -> Void)?
 
+    private let hidWheelMonitor = HIDMouseWheelMonitor()
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private(set) var activeRunMode: NaturalScrollRunMode?
@@ -73,6 +74,7 @@ final class EventTapMonitor {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        hidWheelMonitor.start()
         onTapStatus?(.listening(tapAndMode.mode))
         return true
     }
@@ -119,6 +121,7 @@ final class EventTapMonitor {
         eventTap = nil
         activeRunMode = nil
         requestedRunMode = nil
+        hidWheelMonitor.stop()
         onTapStatus?(.stopped)
     }
 
@@ -175,7 +178,8 @@ final class EventTapMonitor {
             pointDeltaAxis2: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2),
             pointDeltaAxis3: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis3),
             scrollPhase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
-            momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase)
+            momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase),
+            recentMouseWheelInput: hidWheelMonitor.hasRecentMouseWheelInput()
         )
     }
 

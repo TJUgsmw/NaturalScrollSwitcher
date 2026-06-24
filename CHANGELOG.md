@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Stopped requesting Input Monitoring and Accessibility permissions automatically on every launch; permissions are now requested only when the user chooses the menu action.
+- Added HID-level mouse wheel monitoring so ordinary USB/Bluetooth wheel mice are preferred as mouse input even when their CGEvent scroll fields look touch-like.
+- Changed discrete wheel classification so non-continuous wheel events remain mouse input even if macOS attaches a scroll phase.
+- Added `CODESIGN_IDENTITY` and `CODESIGN_KEYCHAIN` support to packaging so local builds can use a stable signing identity and avoid TCC permission resets across updates.
+- Documented why ad-hoc signatures use a changing `cdhash` identity and can require re-granting macOS permissions after reinstalling or updating the app.
+
 ## 0.5.1
 
 - Added runtime fallback modes: Event Correction, Global Fallback, and Manual Only.

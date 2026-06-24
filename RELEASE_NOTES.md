@@ -1,14 +1,14 @@
-# NaturalScrollSwitcher 0.5.1
+# NaturalScrollSwitcher 0.6.0
 
-Fixes the main v0.5.0 failure mode where editable event taps could be unavailable without the app falling back to a usable strategy.
+Focuses on the two problems that made the app feel unreliable: repeated permission prompts and ordinary Bluetooth/USB wheel mice being misclassified as trackpad-like input.
 
 ## What's included
 
-- Three runtime modes: Event Correction, Global Fallback, and Manual Only.
-- Automatic fallback from editable event taps to listen-only global setting sync when Accessibility permission is missing or macOS rejects event modification.
-- Manual mouse and trackpad switches always write the system natural scrolling setting.
-- Clearer menu diagnostics for run mode, recent input source, recent action, and missing permissions.
-- Existing event-level correction for ordinary USB/Bluetooth wheel mice when both Input Monitoring and Accessibility permissions are available.
+- The app no longer requests permissions on every launch; it only reads current permission state unless you click the permission menu item.
+- HID-level mouse wheel detection helps classify ordinary USB/Bluetooth wheel mice as mouse input even when macOS reports touch-like scroll fields.
+- Discrete wheel events are kept as mouse input even if macOS attaches a scroll phase.
+- Packaging supports `CODESIGN_IDENTITY` and `CODESIGN_KEYCHAIN` for stable local signing.
+- Existing fallback modes remain: Event Correction, Global Fallback, and Manual Only.
 - Existing custom app icon, menu bar icon, bilingual menu text, and drag-to-Applications DMG.
 
 ## Install
@@ -17,4 +17,4 @@ Download the `.dmg` or `.zip`, open `NaturalScrollSwitcher.app`, and grant both 
 
 If only Input Monitoring is granted, automatic switching still works through the global setting fallback. Grant Accessibility as well for immediate event-level mouse wheel correction.
 
-This app is ad-hoc signed for local use, not notarized by Apple. macOS may show a first-run warning.
+The default local package is still ad-hoc signed, not notarized by Apple. Ad-hoc signing uses a changing `cdhash`, so macOS may require permissions again after replacing the app with a newly built copy. For stable local permissions across rebuilds, sign with a persistent local certificate via `CODESIGN_IDENTITY`.

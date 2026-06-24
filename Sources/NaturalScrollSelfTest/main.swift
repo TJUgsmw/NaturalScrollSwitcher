@@ -49,6 +49,47 @@ do {
 
     try expectEqual(
         ScrollEventClassifier.classify(
+            ScrollEventSnapshot(
+                eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+                isContinuousScroll: true,
+                deltaAxis1: 1,
+                scrollPhase: 1,
+                recentMouseWheelInput: true
+            )
+        ),
+        .mouse,
+        "recent HID mouse wheel input should override touch-like scroll fields"
+    )
+
+    try expectEqual(
+        ScrollEventClassifier.classify(
+            ScrollEventSnapshot(
+                eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+                isContinuousScroll: false,
+                deltaAxis1: 1,
+                scrollPhase: 1
+            )
+        ),
+        .mouse,
+        "discrete wheel input should remain mouse even if scroll phase is present"
+    )
+
+    try expectEqual(
+        ScrollEventClassifier.classify(
+            ScrollEventSnapshot(
+                eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+                isContinuousScroll: true,
+                deltaAxis1: 1,
+                fixedPointDeltaAxis1: 65_536,
+                scrollPhase: 1
+            )
+        ),
+        .mouse,
+        "wheel steps without point deltas should be mouse even with a scroll phase"
+    )
+
+    try expectEqual(
+        ScrollEventClassifier.classify(
             eventTypeRawValue: ScrollEventClassifier.gestureEventTypeRawValue,
             isContinuousScroll: nil
         ),

@@ -44,7 +44,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastActionStatus = localizer.noSwitchYet
         configureMenu()
         configureMonitor()
-        requestPermissions()
         startPermissionPolling()
         refreshRuntimeState()
     }

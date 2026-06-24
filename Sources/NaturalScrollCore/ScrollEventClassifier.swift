@@ -14,6 +14,7 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
     public var pointDeltaAxis3: Int64
     public var scrollPhase: Int64
     public var momentumPhase: Int64
+    public var recentMouseWheelInput: Bool
 
     public init(
         eventTypeRawValue: Int64,
@@ -28,7 +29,8 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
         pointDeltaAxis2: Int64 = 0,
         pointDeltaAxis3: Int64 = 0,
         scrollPhase: Int64 = 0,
-        momentumPhase: Int64 = 0
+        momentumPhase: Int64 = 0,
+        recentMouseWheelInput: Bool = false
     ) {
         self.eventTypeRawValue = eventTypeRawValue
         self.isContinuousScroll = isContinuousScroll
@@ -43,6 +45,7 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
         self.pointDeltaAxis3 = pointDeltaAxis3
         self.scrollPhase = scrollPhase
         self.momentumPhase = momentumPhase
+        self.recentMouseWheelInput = recentMouseWheelInput
     }
 
     public var hasWheelSteps: Bool {
@@ -56,6 +59,10 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
             pointDeltaAxis1 != 0 ||
             pointDeltaAxis2 != 0 ||
             pointDeltaAxis3 != 0
+    }
+
+    public var hasPointDeltas: Bool {
+        pointDeltaAxis1 != 0 || pointDeltaAxis2 != 0 || pointDeltaAxis3 != 0
     }
 
     public var hasTouchScrollPhase: Bool {
@@ -86,6 +93,18 @@ public enum ScrollEventClassifier {
             return nil
         }
 
+        if snapshot.recentMouseWheelInput {
+            return .mouse
+        }
+
+        if snapshot.isContinuousScroll == false {
+            return .mouse
+        }
+
+        if snapshot.hasWheelSteps && !snapshot.hasPointDeltas {
+            return .mouse
+        }
+
         if snapshot.hasTouchScrollPhase {
             return .trackpad
         }
@@ -96,10 +115,6 @@ public enum ScrollEventClassifier {
 
         if snapshot.isContinuousScroll == true && snapshot.hasPixelDeltas {
             return .trackpad
-        }
-
-        if snapshot.isContinuousScroll == false {
-            return .mouse
         }
 
         return nil
