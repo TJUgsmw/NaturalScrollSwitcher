@@ -2,7 +2,7 @@ import Foundation
 import IOKit.hid
 
 final class HIDMouseWheelMonitor {
-    private let recentInputWindow: CFTimeInterval = 0.35
+    private let recentInputWindow: CFTimeInterval = 0.2
     private var manager: IOHIDManager?
     private var lastMouseWheelInputTime: CFTimeInterval = 0
 

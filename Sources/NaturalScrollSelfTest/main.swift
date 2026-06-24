@@ -84,8 +84,8 @@ do {
                 scrollPhase: 1
             )
         ),
-        .mouse,
-        "wheel steps without point deltas should be mouse even with a scroll phase"
+        .trackpad,
+        "touch-phase scroll without recent HID mouse input should remain trackpad"
     )
 
     try expectEqual(

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Fixed an over-broad mouse heuristic that could classify touch-phase trackpad scroll events as mouse wheel input.
+- Reduced the HID mouse wheel override window so switching from mouse to trackpad is less likely to affect the first trackpad scroll.
+
 ## 0.6.0
 
 - Stopped requesting Input Monitoring and Accessibility permissions automatically on every launch; permissions are now requested only when the user chooses the menu action.

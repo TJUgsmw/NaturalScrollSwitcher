@@ -1,9 +1,11 @@
-# NaturalScrollSwitcher 0.6.0
+# NaturalScrollSwitcher 0.6.1
 
-Focuses on the two problems that made the app feel unreliable: repeated permission prompts and ordinary Bluetooth/USB wheel mice being misclassified as trackpad-like input.
+Patch release for trackpad switching after the v0.6.0 mouse detection changes.
 
 ## What's included
 
+- Fixes an over-broad mouse heuristic that could make touch-phase trackpad scroll events look like mouse wheel input.
+- Reduces the recent HID mouse override window so switching from mouse to trackpad is less likely to affect the first trackpad scroll.
 - The app no longer requests permissions on every launch; it only reads current permission state unless you click the permission menu item.
 - HID-level mouse wheel detection helps classify ordinary USB/Bluetooth wheel mice as mouse input even when macOS reports touch-like scroll fields.
 - Discrete wheel events are kept as mouse input even if macOS attaches a scroll phase.

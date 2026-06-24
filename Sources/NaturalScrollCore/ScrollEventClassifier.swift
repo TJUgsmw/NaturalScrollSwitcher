@@ -101,10 +101,6 @@ public enum ScrollEventClassifier {
             return .mouse
         }
 
-        if snapshot.hasWheelSteps && !snapshot.hasPointDeltas {
-            return .mouse
-        }
-
         if snapshot.hasTouchScrollPhase {
             return .trackpad
         }
