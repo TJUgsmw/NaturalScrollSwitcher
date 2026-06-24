@@ -19,13 +19,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install asset dependencies
-        run: python3 -m pip install --user pillow
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install pillow
 
       - name: Run self-test
         run: swift run NaturalScrollSelfTest
 
       - name: Package release artifacts
-        run: ./scripts/package_release.sh
+        run: PATH="$PWD/.venv/bin:$PATH" ./scripts/package_release.sh
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
