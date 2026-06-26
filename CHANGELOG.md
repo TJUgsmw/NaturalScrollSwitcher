@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.4
+
+- Filtered trackpad-like HID devices out of the recent mouse wheel override so built-in trackpad scrolling is less likely to be misclassified as mouse input.
+- Added a local event diagnostics log at `~/Library/Logs/NaturalScrollSwitcher/events.log` with source classification, run mode, system setting value, and raw scroll fields.
+
 ## 0.6.3
 
 - Restored the original behavior where the macOS global natural scrolling setting follows the active input source: mouse writes the mouse preference, trackpad writes the trackpad preference.

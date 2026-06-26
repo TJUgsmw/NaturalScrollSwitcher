@@ -65,8 +65,10 @@ final class HIDMouseWheelMonitor {
         let element = IOHIDValueGetElement(value)
         let usagePage = IOHIDElementGetUsagePage(element)
         let usage = IOHIDElementGetUsage(element)
+        let device = IOHIDElementGetDevice(element)
 
-        guard isWheelElement(usagePage: usagePage, usage: usage),
+        guard !isTrackpadLikeDevice(device),
+              isWheelElement(usagePage: usagePage, usage: usage),
               IOHIDValueGetIntegerValue(value) != 0 else {
             return
         }
@@ -80,6 +82,25 @@ final class HIDMouseWheelMonitor {
         }
 
         return usagePage == kHIDPage_Consumer && usage == kHIDUsage_Csmr_ACPan
+    }
+
+    private func isTrackpadLikeDevice(_ device: IOHIDDevice) -> Bool {
+        let searchableText = [
+            stringProperty(kIOHIDProductKey, from: device),
+            stringProperty(kIOHIDManufacturerKey, from: device),
+            stringProperty(kIOHIDTransportKey, from: device)
+        ]
+        .compactMap { $0 }
+        .joined(separator: " ")
+        .lowercased()
+
+        return searchableText.contains("trackpad") ||
+            searchableText.contains("multitouch") ||
+            searchableText.contains("multi-touch")
+    }
+
+    private func stringProperty(_ key: String, from device: IOHIDDevice) -> String? {
+        IOHIDDeviceGetProperty(device, key as CFString).map { String(describing: $0) }
     }
 
     private static let inputValueCallback: IOHIDValueCallback = { context, _, _, value in

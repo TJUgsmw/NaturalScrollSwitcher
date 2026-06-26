@@ -1,9 +1,11 @@
-# NaturalScrollSwitcher 0.6.3
+# NaturalScrollSwitcher 0.6.4
 
-Patch release restoring the original visible system-setting behavior while keeping event-level correction as a transition aid.
+Patch release for trackpad auto-switch diagnostics and HID filtering.
 
 ## What's included
 
+- Trackpad-like HID devices are ignored by the mouse wheel override, reducing false mouse detection from built-in trackpads.
+- Local event diagnostics are written to `~/Library/Logs/NaturalScrollSwitcher/events.log`.
 - Mouse input now writes the macOS natural scrolling setting to the mouse preference.
 - Trackpad input now writes the macOS natural scrolling setting to the trackpad preference.
 - Event-level correction is only used while the current system setting has not caught up to the detected mouse preference.

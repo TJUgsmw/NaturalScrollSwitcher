@@ -18,6 +18,7 @@ enum ScrollEventAction {
 struct ScrollEventObservation {
     let source: InputSource
     let action: ScrollEventAction
+    let snapshot: ScrollEventSnapshot
 }
 
 final class EventTapMonitor {
@@ -156,7 +157,8 @@ final class EventTapMonitor {
             self?.onInputEvent?(
                 ScrollEventObservation(
                     source: decision.source,
-                    action: action
+                    action: action,
+                    snapshot: snapshot
                 )
             )
         }

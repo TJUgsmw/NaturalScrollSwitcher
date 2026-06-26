@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = AppSettings()
     private let localizer = AppLocalizer()
     private let monitor = EventTapMonitor()
+    private let diagnosticsLogger = EventDiagnosticsLogger()
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
@@ -204,6 +205,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             source: observation.source,
             corrected: observation.action == .invertedMouseScroll
         )
+        diagnosticsLogger.logObservation(
+            observation,
+            runMode: activeRunMode,
+            systemValue: preferences.currentValue()
+        )
         switch activeRunMode {
         case .eventCorrection:
             applySystemSetting(for: observation.source)
@@ -222,6 +228,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
             lastActionStatus = localizer.passThroughAction(source: source)
             refreshMonitorConfiguration()
+            diagnosticsLogger.log(
+                "setting already source=\(source.rawValue) desired=\(desiredValue) observed=\(preferences.currentValue().map(String.init) ?? "unknown")"
+            )
             return
         }
 
@@ -233,8 +242,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 source: source,
                 naturalScrollEnabled: desiredValue
             )
+            diagnosticsLogger.log(
+                "setting wrote source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown")"
+            )
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
+            diagnosticsLogger.log(
+                "setting failed source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown")"
+            )
         }
     }
 
