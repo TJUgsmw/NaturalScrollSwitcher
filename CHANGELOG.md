@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.5
+
+- Fixed Event Correction mode so it keeps the macOS global natural scrolling setting aligned with the trackpad preference instead of repeatedly switching the global setting between mouse and trackpad.
+- Mouse wheel direction is now corrected against that stable trackpad baseline, which avoids relying on macOS to immediately reload the global preference after every device switch.
+- Preference writes now refresh `cfprefsd` after synchronization to reduce stale natural scrolling behavior in Global Fallback and manual writes.
+- Broadened HID wheel monitoring so Bluetooth mice that expose wheel input outside the standard mouse collection can still be recognized as mouse input.
+- Added a self-test for trackpad event correction when the active baseline is still on the mouse preference.
+
 ## 0.6.4
 
 - Filtered trackpad-like HID devices out of the recent mouse wheel override so built-in trackpad scrolling is less likely to be misclassified as mouse input.

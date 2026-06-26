@@ -12,12 +12,7 @@ final class HIDMouseWheelMonitor {
         }
 
         let newManager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
-        let mouseMatching: [String: Any] = [
-            kIOHIDDeviceUsagePageKey: kHIDPage_GenericDesktop,
-            kIOHIDDeviceUsageKey: kHIDUsage_GD_Mouse
-        ]
-
-        IOHIDManagerSetDeviceMatchingMultiple(newManager, [mouseMatching] as CFArray)
+        IOHIDManagerSetDeviceMatching(newManager, nil)
         IOHIDManagerRegisterInputValueCallback(
             newManager,
             HIDMouseWheelMonitor.inputValueCallback,

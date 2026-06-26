@@ -3,6 +3,7 @@ import Foundation
 public struct PreferenceWriteResult: Equatable {
     public let requestedValue: Bool
     public let synchronized: Bool
+    public let refreshedPreferencesDaemon: Bool
     public let observedValue: Bool?
 
     public var succeeded: Bool {
@@ -54,11 +55,27 @@ public final class NaturalScrollPreferences {
             kCFPreferencesCurrentUser,
             kCFPreferencesAnyHost
         )
+        let refreshed = Self.refreshPreferencesDaemon()
 
         return PreferenceWriteResult(
             requestedValue: enabled,
             synchronized: synchronized,
+            refreshedPreferencesDaemon: refreshed,
             observedValue: currentValue()
         )
+    }
+
+    private static func refreshPreferencesDaemon() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        process.arguments = ["cfprefsd"]
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
 }

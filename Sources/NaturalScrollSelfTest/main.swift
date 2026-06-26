@@ -211,6 +211,25 @@ do {
         "trackpad scrolling should not be event-corrected"
     )
 
+    let pendingTrackpadCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            pointDeltaAxis1: 5,
+            scrollPhase: 2
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: false,
+            trackpadNaturalScrollEnabled: true,
+            systemNaturalScrollEnabled: false
+        )
+    )
+    try expectEqual(
+        pendingTrackpadCorrection,
+        ScrollEventDecision(source: .trackpad, shouldInvertEvent: true),
+        "trackpad scrolling should be corrected if the current baseline is still the mouse preference"
+    )
+
     try expectEqual(
         NaturalScrollRunMode.resolve(
             inputMonitoringAllowed: true,

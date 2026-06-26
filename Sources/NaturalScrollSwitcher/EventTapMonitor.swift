@@ -12,7 +12,7 @@ enum EventTapStatus {
 
 enum ScrollEventAction {
     case passedThrough
-    case invertedMouseScroll
+    case invertedScroll
 }
 
 struct ScrollEventObservation {
@@ -146,9 +146,9 @@ final class EventTapMonitor {
         }
 
         let action: ScrollEventAction
-        if activeRunMode == .eventCorrection && decision.shouldInvertEvent {
+        if activeRunMode == .eventCorrection && decision.shouldInvertEvent && snapshot.hasInvertibleDeltas {
             invertScrollEvent(event)
-            action = .invertedMouseScroll
+            action = .invertedScroll
         } else {
             action = .passedThrough
         }

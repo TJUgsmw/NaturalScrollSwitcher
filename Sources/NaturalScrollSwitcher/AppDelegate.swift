@@ -130,6 +130,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if case let .listening(mode) = status {
                 self.activeRunMode = mode
+                self.refreshMonitorConfiguration()
+                if mode == .eventCorrection {
+                    self.syncTrackpadBaselineIfNeeded(force: true)
+                }
             }
             self.lastTapMessage = self.localizedTapStatus(status)
             self.updateMenu()
@@ -175,6 +179,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             activeRunMode = monitor.activeRunMode ?? desiredRunMode
+            refreshMonitorConfiguration()
+            if activeRunMode == .eventCorrection {
+                syncTrackpadBaselineIfNeeded(force: false)
+            }
             if activeRunMode == .globalFallback && desiredRunMode == .eventCorrection {
                 lastTapMessage = localizer.eventCorrectionUnavailableUsingFallback
             }
@@ -203,7 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastInputSource = observation.source
         lastActionStatus = localizer.eventAction(
             source: observation.source,
-            corrected: observation.action == .invertedMouseScroll
+            corrected: observation.action == .invertedScroll
         )
         diagnosticsLogger.logObservation(
             observation,
@@ -212,7 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         switch activeRunMode {
         case .eventCorrection:
-            applySystemSetting(for: observation.source)
+            syncTrackpadBaselineIfNeeded(force: false)
         case .globalFallback:
             applySystemSetting(for: observation.source)
         case .manualOnly:
@@ -243,12 +251,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 naturalScrollEnabled: desiredValue
             )
             diagnosticsLogger.log(
-                "setting wrote source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown")"
+                "setting wrote source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
             )
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
             diagnosticsLogger.log(
-                "setting failed source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown")"
+                "setting failed source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
             )
         }
     }
@@ -264,14 +272,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if result.succeeded {
             lastSyncedTrackpadBaseline = baseline
             lastWriteStatus = localizer.trackpadBaselineSynced(enabled: baseline)
+            diagnosticsLogger.log(
+                "baseline wrote source=trackpad desired=\(baseline) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
+            )
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
+            diagnosticsLogger.log(
+                "baseline failed source=trackpad desired=\(baseline) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
+            )
         }
     }
 
     private func refreshMonitorConfiguration() {
         var configuration = settings.configuration
-        configuration.systemNaturalScrollEnabled = preferences.currentValue()
+        if activeRunMode == .eventCorrection || monitor.activeRunMode == .eventCorrection {
+            configuration.systemNaturalScrollEnabled = configuration.trackpadNaturalScrollEnabled
+        } else {
+            configuration.systemNaturalScrollEnabled = preferences.currentValue()
+        }
         monitor.configuration = configuration
     }
 
@@ -349,7 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshMonitorConfiguration()
         lastWriteStatus = localizer.preferenceChanged(source: .mouse, enabled: enabled)
         if lastInputSource == .mouse {
-            applySystemSetting(for: .mouse)
+            applySelectionSetting(for: .mouse)
             updateMenu()
         } else {
             updateMenu()
@@ -362,7 +380,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshMonitorConfiguration()
         lastWriteStatus = localizer.preferenceChanged(source: .trackpad, enabled: enabled)
         if lastInputSource == .trackpad {
-            applySystemSetting(for: .trackpad)
+            applySelectionSetting(for: .trackpad)
         }
         updateMenu()
     }
@@ -382,14 +400,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func switchToMouse() {
         lastInputSource = .mouse
-        applySystemSetting(for: .mouse)
+        applySelectionSetting(for: .mouse)
         updateMenu()
     }
 
     @objc private func switchToTrackpad() {
         lastInputSource = .trackpad
-        applySystemSetting(for: .trackpad)
+        applySelectionSetting(for: .trackpad)
         updateMenu()
+    }
+
+    private func applySelectionSetting(for source: InputSource) {
+        if activeRunMode == .eventCorrection && autoSwitchEnabled {
+            syncTrackpadBaselineIfNeeded(force: false)
+            refreshMonitorConfiguration()
+        } else {
+            applySystemSetting(for: source)
+        }
     }
 
     @objc private func quit() {

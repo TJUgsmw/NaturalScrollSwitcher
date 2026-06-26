@@ -65,6 +65,10 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
         pointDeltaAxis1 != 0 || pointDeltaAxis2 != 0 || pointDeltaAxis3 != 0
     }
 
+    public var hasInvertibleDeltas: Bool {
+        hasWheelSteps || hasPixelDeltas
+    }
+
     public var hasTouchScrollPhase: Bool {
         scrollPhase != 0 || momentumPhase != 0
     }
@@ -136,12 +140,8 @@ public enum ScrollEventClassifier {
             return nil
         }
 
-        guard source == .mouse else {
-            return ScrollEventDecision(source: source, shouldInvertEvent: false)
-        }
-
         let baseline = configuration.systemNaturalScrollEnabled ?? configuration.trackpadNaturalScrollEnabled
-        let desired = configuration.mouseNaturalScrollEnabled
-        return ScrollEventDecision(source: .mouse, shouldInvertEvent: baseline != desired)
+        let desired = configuration.naturalScrollEnabled(for: source)
+        return ScrollEventDecision(source: source, shouldInvertEvent: baseline != desired)
     }
 }

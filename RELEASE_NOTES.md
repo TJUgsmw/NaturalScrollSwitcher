@@ -1,15 +1,17 @@
-# NaturalScrollSwitcher 0.6.4
+# NaturalScrollSwitcher 0.6.5
 
-Patch release for trackpad auto-switch diagnostics and HID filtering.
+Patch release for the case where macOS only applies natural scrolling changes after manually toggling the setting in System Settings.
 
 ## What's included
 
+- Event Correction mode now keeps the macOS global natural scrolling setting on the trackpad preference and corrects mouse wheel events against that stable baseline.
+- The app no longer depends on macOS immediately reloading the global natural scrolling preference on every mouse/trackpad switch when full permissions are available.
+- Preference writes now refresh `cfprefsd` after synchronization, improving Global Fallback and manual switching behavior.
+- HID wheel monitoring now listens across HID devices, then filters for wheel elements and ignores trackpad-like devices. This helps Bluetooth mice whose wheel is not exposed through the standard mouse collection.
+- Trackpad events can be corrected during a stale baseline transition if the event carries invertible scroll deltas.
+- Added self-test coverage for pending trackpad correction.
 - Trackpad-like HID devices are ignored by the mouse wheel override, reducing false mouse detection from built-in trackpads.
 - Local event diagnostics are written to `~/Library/Logs/NaturalScrollSwitcher/events.log`.
-- Mouse input now writes the macOS natural scrolling setting to the mouse preference.
-- Trackpad input now writes the macOS natural scrolling setting to the trackpad preference.
-- Event-level correction is only used while the current system setting has not caught up to the detected mouse preference.
-- This avoids double-inverting mouse wheel events once the system setting already matches the mouse preference.
 - GitHub Actions now installs Pillow in a project-local Python virtual environment instead of using `pip install --user`.
 - This avoids PEP 668 `externally-managed-environment` failures on newer macOS runners.
 - Fixes an over-broad mouse heuristic that could make touch-phase trackpad scroll events look like mouse wheel input.

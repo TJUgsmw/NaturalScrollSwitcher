@@ -281,13 +281,17 @@ public struct AppLocalizer: Sendable {
             return "Corrected mouse scroll"
         case (.english, .mouse, false):
             return "Mouse scroll passed through"
-        case (.english, .trackpad, _):
+        case (.english, .trackpad, true):
+            return "Corrected trackpad scroll"
+        case (.english, .trackpad, false):
             return "Trackpad scroll passed through"
         case (.simplifiedChinese, .mouse, true):
             return "已修正鼠标滚动"
         case (.simplifiedChinese, .mouse, false):
             return "鼠标滚动未修正"
-        case (.simplifiedChinese, .trackpad, _):
+        case (.simplifiedChinese, .trackpad, true):
+            return "已修正触控板滚动"
+        case (.simplifiedChinese, .trackpad, false):
             return "触控板滚动未修正"
         }
     }
