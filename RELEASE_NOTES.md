@@ -1,9 +1,13 @@
-# NaturalScrollSwitcher 0.6.6
+# NaturalScrollSwitcher 0.6.7
 
-Patch release for manual and automatic mouse switching.
+Patch release for machines where the system setting shows the right value but the final mouse wheel direction still feels wrong.
 
 ## What's included
 
+- New menu toggle: Force Mouse Direction Correction.
+- When this toggle is enabled and mouse natural scrolling is off, mouse wheel events are inverted even if the macOS global natural scrolling setting already reads off.
+- This is intended for compatibility with extra scroll processing from remote-control tools, mouse utilities, or apps that do not fully follow the system natural scrolling setting.
+- Added self-test coverage for the forced correction path.
 - Mouse input writes the macOS global natural scrolling setting to the mouse preference again.
 - Trackpad input writes the macOS global natural scrolling setting to the trackpad preference again.
 - Manual "Switch to Mouse" now writes the mouse preference even when Event Correction mode is active.

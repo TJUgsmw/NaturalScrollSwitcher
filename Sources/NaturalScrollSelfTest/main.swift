@@ -161,6 +161,25 @@ do {
         "mouse scrolling should pass through once the system setting already matches the mouse preference"
     )
 
+    let forcedMouseCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: false,
+            trackpadNaturalScrollEnabled: true,
+            systemNaturalScrollEnabled: false,
+            forceMouseDirectionCorrection: true
+        )
+    )
+    try expectEqual(
+        forcedMouseCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: true),
+        "forced mouse direction correction should invert even when the system setting already matches"
+    )
+
     let pendingMouseCorrection = ScrollEventClassifier.decision(
         for: ScrollEventSnapshot(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
@@ -289,6 +308,11 @@ do {
         chineseLocalizer.automaticSwitching,
         "自动切换",
         "Chinese localizer should provide Chinese menu text"
+    )
+    try expectEqual(
+        chineseLocalizer.forceMouseDirectionCorrection,
+        "强制修正鼠标方向",
+        "Chinese localizer should provide forced mouse correction text"
     )
     try expectEqual(
         chineseLocalizer.sourceTitle(.trackpad, naturalScrollEnabled: true),

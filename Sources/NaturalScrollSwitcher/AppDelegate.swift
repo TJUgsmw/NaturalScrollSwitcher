@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let autoSwitchItem = NSMenuItem(title: "", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
     private let mouseNaturalItem = NSMenuItem(title: "", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
     private let trackpadNaturalItem = NSMenuItem(title: "", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
+    private let forceMouseDirectionItem = NSMenuItem(title: "", action: #selector(toggleForceMouseDirectionCorrection), keyEquivalent: "")
     private let permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let tapStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let actionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -65,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             autoSwitchItem,
             mouseNaturalItem,
             trackpadNaturalItem,
+            forceMouseDirectionItem,
             requestPermissionsItem,
             openInputSettingsItem,
             openAccessibilitySettingsItem,
@@ -85,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(autoSwitchItem)
         menu.addItem(mouseNaturalItem)
         menu.addItem(trackpadNaturalItem)
+        menu.addItem(forceMouseDirectionItem)
         menu.addItem(.separator())
         menu.addItem(switchMouseItem)
         menu.addItem(switchTrackpadItem)
@@ -304,6 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseNaturalItem.state = configuration.mouseNaturalScrollEnabled ? .on : .off
         trackpadNaturalItem.title = localizer.trackpadNaturalScrolling
         trackpadNaturalItem.state = configuration.trackpadNaturalScrollEnabled ? .on : .off
+        forceMouseDirectionItem.title = localizer.forceMouseDirectionCorrection
+        forceMouseDirectionItem.state = configuration.forceMouseDirectionCorrection ? .on : .off
         switchMouseItem.title = localizer.switchToSourceTitle(
             .mouse,
             naturalScrollEnabled: configuration.mouseNaturalScrollEnabled
@@ -372,6 +377,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if lastInputSource == .trackpad {
             applySystemSetting(for: .trackpad)
         }
+        updateMenu()
+    }
+
+    @objc private func toggleForceMouseDirectionCorrection() {
+        let enabled = !settings.configuration.forceMouseDirectionCorrection
+        settings.setForceMouseDirectionCorrection(enabled)
+        refreshMonitorConfiguration()
+        lastWriteStatus = localizer.forceMouseDirectionCorrection
         updateMenu()
     }
 

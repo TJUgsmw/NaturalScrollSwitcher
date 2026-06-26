@@ -5,6 +5,7 @@ final class AppSettings {
     private enum Key {
         static let mouseNaturalScrollEnabled = "mouseNaturalScrollEnabled"
         static let trackpadNaturalScrollEnabled = "trackpadNaturalScrollEnabled"
+        static let forceMouseDirectionCorrection = "forceMouseDirectionCorrection"
     }
 
     private let defaults: UserDefaults
@@ -22,6 +23,10 @@ final class AppSettings {
             trackpadNaturalScrollEnabled: bool(
                 forKey: Key.trackpadNaturalScrollEnabled,
                 defaultValue: true
+            ),
+            forceMouseDirectionCorrection: bool(
+                forKey: Key.forceMouseDirectionCorrection,
+                defaultValue: false
             )
         )
     }
@@ -37,6 +42,10 @@ final class AppSettings {
         case .trackpad:
             defaults.set(enabled, forKey: Key.trackpadNaturalScrollEnabled)
         }
+    }
+
+    func setForceMouseDirectionCorrection(_ enabled: Bool) {
+        defaults.set(enabled, forKey: Key.forceMouseDirectionCorrection)
     }
 
     private func bool(forKey key: String, defaultValue: Bool) -> Bool {

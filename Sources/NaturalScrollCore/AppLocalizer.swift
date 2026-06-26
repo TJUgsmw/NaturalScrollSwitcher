@@ -110,6 +110,15 @@ public struct AppLocalizer: Sendable {
         }
     }
 
+    public var forceMouseDirectionCorrection: String {
+        switch language {
+        case .english:
+            return "Force Mouse Direction Correction"
+        case .simplifiedChinese:
+            return "强制修正鼠标方向"
+        }
+    }
+
     public var requestPermissions: String {
         switch language {
         case .english:

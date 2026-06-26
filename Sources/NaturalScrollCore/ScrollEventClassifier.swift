@@ -142,6 +142,9 @@ public enum ScrollEventClassifier {
 
         let baseline = configuration.systemNaturalScrollEnabled ?? configuration.trackpadNaturalScrollEnabled
         let desired = configuration.naturalScrollEnabled(for: source)
+        if source == .mouse && configuration.forceMouseDirectionCorrection && !desired {
+            return ScrollEventDecision(source: source, shouldInvertEvent: true)
+        }
         return ScrollEventDecision(source: source, shouldInvertEvent: baseline != desired)
     }
 }

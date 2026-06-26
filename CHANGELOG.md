@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.7
+
+- Added a Force Mouse Direction Correction menu toggle for systems where macOS shows natural scrolling as off but the final mouse wheel direction still behaves as if it is on.
+- The forced correction path inverts mouse wheel events when the mouse preference is Natural Off, even if the global system setting already matches that preference.
+- Added self-test coverage for forced mouse correction.
+
 ## 0.6.6
 
 - Restored the original contract that mouse input writes the macOS global natural scrolling setting to the mouse preference and trackpad input writes it to the trackpad preference.
