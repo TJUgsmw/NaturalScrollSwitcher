@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.6
+
+- Restored the original contract that mouse input writes the macOS global natural scrolling setting to the mouse preference and trackpad input writes it to the trackpad preference.
+- Fixed manual "Switch to Mouse" in Event Correction mode so it immediately writes the mouse preference instead of preserving the trackpad baseline.
+- Event-level correction remains a transition aid and now uses the actual current system setting as its baseline again, avoiding double correction after the global setting changes.
+
 ## 0.6.5
 
 - Fixed Event Correction mode so it keeps the macOS global natural scrolling setting aligned with the trackpad preference instead of repeatedly switching the global setting between mouse and trackpad.

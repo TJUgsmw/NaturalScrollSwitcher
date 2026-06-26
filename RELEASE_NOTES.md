@@ -1,11 +1,13 @@
-# NaturalScrollSwitcher 0.6.5
+# NaturalScrollSwitcher 0.6.6
 
-Patch release for the case where macOS only applies natural scrolling changes after manually toggling the setting in System Settings.
+Patch release for manual and automatic mouse switching.
 
 ## What's included
 
-- Event Correction mode now keeps the macOS global natural scrolling setting on the trackpad preference and corrects mouse wheel events against that stable baseline.
-- The app no longer depends on macOS immediately reloading the global natural scrolling preference on every mouse/trackpad switch when full permissions are available.
+- Mouse input writes the macOS global natural scrolling setting to the mouse preference again.
+- Trackpad input writes the macOS global natural scrolling setting to the trackpad preference again.
+- Manual "Switch to Mouse" now writes the mouse preference even when Event Correction mode is active.
+- Event-level correction uses the actual current system setting as its baseline and only corrects while the setting differs from the detected device preference.
 - Preference writes now refresh `cfprefsd` after synchronization, improving Global Fallback and manual switching behavior.
 - HID wheel monitoring now listens across HID devices, then filters for wheel elements and ignores trackpad-like devices. This helps Bluetooth mice whose wheel is not exposed through the standard mouse collection.
 - Trackpad events can be corrected during a stale baseline transition if the event carries invertible scroll deltas.
