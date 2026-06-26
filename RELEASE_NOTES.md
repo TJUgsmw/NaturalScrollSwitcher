@@ -1,9 +1,12 @@
-# NaturalScrollSwitcher 0.6.7
+# NaturalScrollSwitcher 0.6.8
 
-Patch release for machines where the system setting shows the right value but the final mouse wheel direction still feels wrong.
+Patch release for machines where in-place scroll event correction is visible in diagnostics but does not affect the final scroll direction.
 
 ## What's included
 
+- Force Mouse Direction Correction now suppresses the original mouse wheel event and reposts an inverted synthetic event.
+- Reposted synthetic events are marked so NaturalScrollSwitcher does not handle them recursively.
+- This is stronger than v0.6.7's in-place forced correction and is intended for environments where another layer ignores or overwrites modified scroll events.
 - New menu toggle: Force Mouse Direction Correction.
 - When this toggle is enabled and mouse natural scrolling is off, mouse wheel events are inverted even if the macOS global natural scrolling setting already reads off.
 - This is intended for compatibility with extra scroll processing from remote-control tools, mouse utilities, or apps that do not fully follow the system natural scrolling setting.

@@ -13,6 +13,7 @@ enum EventTapStatus {
 enum ScrollEventAction {
     case passedThrough
     case invertedScroll
+    case repostedInvertedScroll
 }
 
 struct ScrollEventObservation {
@@ -22,6 +23,8 @@ struct ScrollEventObservation {
 }
 
 final class EventTapMonitor {
+    private static let syntheticEventMarker: Int64 = 0x4E535357
+
     var configuration = NaturalScrollConfiguration()
     var onInputEvent: ((ScrollEventObservation) -> Void)?
     var onTapStatus: ((EventTapStatus) -> Void)?
@@ -126,7 +129,7 @@ final class EventTapMonitor {
         onTapStatus?(.stopped)
     }
 
-    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
+    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
@@ -134,6 +137,10 @@ final class EventTapMonitor {
                     self?.onTapStatus?(.reenabled)
                 }
             }
+            return Unmanaged.passUnretained(event)
+        }
+
+        if event.getIntegerValueField(.eventSourceUserData) == Self.syntheticEventMarker {
             return Unmanaged.passUnretained(event)
         }
 
@@ -147,23 +154,46 @@ final class EventTapMonitor {
 
         let action: ScrollEventAction
         if activeRunMode == .eventCorrection && decision.shouldInvertEvent && snapshot.hasInvertibleDeltas {
-            invertScrollEvent(event)
-            action = .invertedScroll
+            if shouldRepostInvertedEvent(for: decision), let eventCopy = event.copy() {
+                invertScrollEvent(eventCopy)
+                eventCopy.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEventMarker)
+                eventCopy.post(tap: .cgSessionEventTap)
+                action = .repostedInvertedScroll
+                notifyInputEvent(source: decision.source, action: action, snapshot: snapshot)
+                return nil
+            } else {
+                invertScrollEvent(event)
+                action = .invertedScroll
+            }
         } else {
             action = .passedThrough
         }
 
+        notifyInputEvent(source: decision.source, action: action, snapshot: snapshot)
+
+        return Unmanaged.passUnretained(event)
+    }
+
+    private func shouldRepostInvertedEvent(for decision: ScrollEventDecision) -> Bool {
+        decision.source == .mouse &&
+            configuration.forceMouseDirectionCorrection &&
+            !configuration.mouseNaturalScrollEnabled
+    }
+
+    private func notifyInputEvent(
+        source: InputSource,
+        action: ScrollEventAction,
+        snapshot: ScrollEventSnapshot
+    ) {
         DispatchQueue.main.async { [weak self] in
             self?.onInputEvent?(
                 ScrollEventObservation(
-                    source: decision.source,
+                    source: source,
                     action: action,
                     snapshot: snapshot
                 )
             )
         }
-
-        return Unmanaged.passUnretained(event)
     }
 
     private func makeSnapshot(type: CGEventType, event: CGEvent) -> ScrollEventSnapshot {

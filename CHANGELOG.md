@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.8
+
+- Changed Force Mouse Direction Correction to suppress the original mouse wheel event and repost an inverted synthetic event.
+- Synthetic reposted events are marked with `eventSourceUserData` to avoid recursive event tap handling.
+- This targets environments where in-place scroll event edits are observed in diagnostics but do not affect the final scrolling behavior.
+
 ## 0.6.7
 
 - Added a Force Mouse Direction Correction menu toggle for systems where macOS shows natural scrolling as off but the final mouse wheel direction still behaves as if it is on.

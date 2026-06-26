@@ -208,7 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastInputSource = observation.source
         lastActionStatus = localizer.eventAction(
             source: observation.source,
-            corrected: observation.action == .invertedScroll
+            corrected: observation.action != .passedThrough
         )
         diagnosticsLogger.logObservation(
             observation,
