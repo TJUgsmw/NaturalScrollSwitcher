@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.7.2
+
+- Fixes excessive CPU use during trackpad input on macOS 27 by delivering source changes instead of every gesture to the menu and settings code.
+- Avoids setting an unchanged menu bar title, which triggered repeated AppKit status item snapshots on macOS 27.0.1.
+- Filters HID input values to vertical and horizontal wheels while retaining support for Bluetooth mice outside the standard mouse collection.
+- Disables detailed event snapshots by default; logs only startup, runtime changes, and setting writes.
+- Writes diagnostics on a utility queue, reuses the date formatter and file handle, and caps the log at 1 MiB, including oversized logs from older versions.
+- Removes permanent two-second permission polling. Permissions are checked on menu opening, wake, and session activation; temporary polling is limited to two minutes after a permission request.
+- Preserves immediate mouse/trackpad source transitions, manual switching, and detection after automatic switching resumes.
+- Adds gesture-burst and bounded-log regression checks and a zero-payload load probe for local performance comparisons.
+
+## 0.7.1
+
+- Uses live system switching as the primary mode: mouse input turns the real macOS natural scrolling setting off, and trackpad input turns it on.
+- Input Monitoring is the only required permission; Accessibility is no longer requested.
+- Removes the fixed trackpad baseline that could immediately turn natural scrolling back on after the user switched to a mouse.
+- Applies natural scrolling through the same live system interface used by System Settings, then synchronizes the global preference value.
+- Removes Force Mouse Direction Correction and migrates its saved value away because it could double-invert mouse scrolling.
+- Global Fallback now writes only when the detected input source changes.
+
+## 0.7.0
+
+- Event correction now uses each scroll event's live natural-scroll direction from `NSEvent.isDirectionInvertedFromDevice`.
+- This fixes cases where `defaults` already shows the requested value but macOS keeps using the previous scroll direction until System Settings is toggled manually.
+- Diagnostics now log the event-level natural-scroll state as `eventNatural=...`.
+
+## 0.6.9
+
+- Fixed a double-inversion bug in Force Mouse Direction Correction.
+- Forced mouse correction no longer reverses mouse events when the macOS global natural scrolling setting already matches the mouse preference.
+- This prevents the app from turning a correctly disabled mouse natural scrolling state back into natural scrolling.
+
 ## 0.6.8
 
 - Changed Force Mouse Direction Correction to suppress the original mouse wheel event and repost an inverted synthetic event.

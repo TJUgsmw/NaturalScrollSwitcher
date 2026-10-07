@@ -25,6 +25,44 @@ func expectNil<T>(_ actual: T?, _ message: String) throws {
 }
 
 do {
+    var transitions = InputSourceTransitionTracker()
+    var delivered = 0
+    for _ in 0..<100_000 {
+        if transitions.observe(.trackpad) { delivered += 1 }
+    }
+    try expectEqual(delivered, 1, "a gesture burst should deliver only the first source transition")
+    try expectEqual(transitions.observe(.mouse), true, "switching to a mouse should deliver immediately")
+    try expectEqual(transitions.observe(.mouse), false, "repeated mouse events should not refresh the menu")
+    try expectEqual(transitions.observe(.trackpad), true, "switching back to a trackpad should still deliver")
+    transitions.reset(to: .mouse)
+    try expectEqual(transitions.observe(.trackpad), true, "trackpad input must override a manual mouse selection")
+    transitions.reset()
+    try expectEqual(transitions.observe(.trackpad), true, "restarting detection must observe the first device again")
+
+    let logDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: logDirectory) }
+    let logURL = logDirectory.appendingPathComponent("events.log")
+    try Data(String(repeating: "legacy diagnostic entry\n", count: 1_000).utf8).write(to: logURL)
+    let boundedLog = BoundedDiagnosticsLog(url: logURL, maximumBytes: 2_048)
+    boundedLog.append("upgrade entry")
+    boundedLog.flush()
+    try expectEqual(
+        try Data(contentsOf: logURL).count <= 2_048,
+        true,
+        "upgrading must trim an oversized legacy log without loading all of it"
+    )
+    for index in 0..<500 {
+        boundedLog.append("entry-\(index) \(String(repeating: "x", count: 80))")
+    }
+    boundedLog.append(String(repeating: "large-message", count: 1_000))
+    boundedLog.append("final-entry")
+    boundedLog.flush()
+    let boundedData = try Data(contentsOf: logURL)
+    try expectEqual(boundedData.count <= 2_048, true, "the log must stay bounded after repeated writes")
+    let boundedText = String(decoding: boundedData, as: UTF8.self)
+    try expectEqual(boundedText.hasSuffix("final-entry\n"), true, "log compaction must preserve the newest entry")
+
     try expectEqual(
         ScrollEventClassifier.classify(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
@@ -147,7 +185,8 @@ do {
         for: ScrollEventSnapshot(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
             isContinuousScroll: true,
-            deltaAxis1: 1
+            deltaAxis1: 1,
+            eventNaturalScrollEnabled: false
         ),
         configuration: NaturalScrollConfiguration(
             mouseNaturalScrollEnabled: false,
@@ -161,30 +200,12 @@ do {
         "mouse scrolling should pass through once the system setting already matches the mouse preference"
     )
 
-    let forcedMouseCorrection = ScrollEventClassifier.decision(
-        for: ScrollEventSnapshot(
-            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
-            isContinuousScroll: true,
-            deltaAxis1: 1
-        ),
-        configuration: NaturalScrollConfiguration(
-            mouseNaturalScrollEnabled: false,
-            trackpadNaturalScrollEnabled: true,
-            systemNaturalScrollEnabled: false,
-            forceMouseDirectionCorrection: true
-        )
-    )
-    try expectEqual(
-        forcedMouseCorrection,
-        ScrollEventDecision(source: .mouse, shouldInvertEvent: true),
-        "forced mouse direction correction should invert even when the system setting already matches"
-    )
-
     let pendingMouseCorrection = ScrollEventClassifier.decision(
         for: ScrollEventSnapshot(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
             isContinuousScroll: true,
-            deltaAxis1: 1
+            deltaAxis1: 1,
+            eventNaturalScrollEnabled: true
         ),
         configuration: NaturalScrollConfiguration(
             mouseNaturalScrollEnabled: false,
@@ -202,7 +223,8 @@ do {
         for: ScrollEventSnapshot(
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
             isContinuousScroll: true,
-            deltaAxis1: 1
+            deltaAxis1: 1,
+            eventNaturalScrollEnabled: true
         ),
         configuration: NaturalScrollConfiguration(
             mouseNaturalScrollEnabled: true,
@@ -235,7 +257,8 @@ do {
             eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
             isContinuousScroll: true,
             pointDeltaAxis1: 5,
-            scrollPhase: 2
+            scrollPhase: 2,
+            eventNaturalScrollEnabled: false
         ),
         configuration: NaturalScrollConfiguration(
             mouseNaturalScrollEnabled: false,
@@ -249,13 +272,32 @@ do {
         "trackpad scrolling should be corrected if the current baseline is still the mouse preference"
     )
 
+    let staleDefaultsMouseCorrection = ScrollEventClassifier.decision(
+        for: ScrollEventSnapshot(
+            eventTypeRawValue: ScrollEventClassifier.scrollWheelEventTypeRawValue,
+            isContinuousScroll: true,
+            deltaAxis1: 1,
+            eventNaturalScrollEnabled: true
+        ),
+        configuration: NaturalScrollConfiguration(
+            mouseNaturalScrollEnabled: false,
+            trackpadNaturalScrollEnabled: true,
+            systemNaturalScrollEnabled: false
+        )
+    )
+    try expectEqual(
+        staleDefaultsMouseCorrection,
+        ScrollEventDecision(source: .mouse, shouldInvertEvent: true),
+        "event direction should override stale defaults when System Settings has not refreshed the input pipeline"
+    )
+
     try expectEqual(
         NaturalScrollRunMode.resolve(
             inputMonitoringAllowed: true,
             accessibilityTrusted: true
         ),
-        .eventCorrection,
-        "full permissions should enable event correction"
+        .globalFallback,
+        "input monitoring should use live system switching even when accessibility is granted"
     )
     try expectEqual(
         NaturalScrollRunMode.resolve(
@@ -308,11 +350,6 @@ do {
         chineseLocalizer.automaticSwitching,
         "自动切换",
         "Chinese localizer should provide Chinese menu text"
-    )
-    try expectEqual(
-        chineseLocalizer.forceMouseDirectionCorrection,
-        "强制修正鼠标方向",
-        "Chinese localizer should provide forced mouse correction text"
     )
     try expectEqual(
         chineseLocalizer.sourceTitle(.trackpad, naturalScrollEnabled: true),

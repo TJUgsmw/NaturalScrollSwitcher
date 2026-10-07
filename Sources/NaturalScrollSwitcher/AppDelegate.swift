@@ -3,7 +3,7 @@ import Foundation
 import NaturalScrollCore
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let preferences = NaturalScrollPreferences()
     private let settings = AppSettings()
     private let localizer = AppLocalizer()
@@ -18,13 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let autoSwitchItem = NSMenuItem(title: "", action: #selector(toggleAutomaticSwitching), keyEquivalent: "")
     private let mouseNaturalItem = NSMenuItem(title: "", action: #selector(toggleMouseNaturalScrolling), keyEquivalent: "")
     private let trackpadNaturalItem = NSMenuItem(title: "", action: #selector(toggleTrackpadNaturalScrolling), keyEquivalent: "")
-    private let forceMouseDirectionItem = NSMenuItem(title: "", action: #selector(toggleForceMouseDirectionCorrection), keyEquivalent: "")
     private let permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let tapStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let actionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let requestPermissionsItem = NSMenuItem(title: "", action: #selector(requestPermissions), keyEquivalent: "")
     private let openInputSettingsItem = NSMenuItem(title: "", action: #selector(openInputMonitoringSettings), keyEquivalent: "")
-    private let openAccessibilitySettingsItem = NSMenuItem(title: "", action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let switchMouseItem = NSMenuItem(title: "", action: #selector(switchToMouse), keyEquivalent: "")
     private let switchTrackpadItem = NSMenuItem(title: "", action: #selector(switchToTrackpad), keyEquivalent: "")
     private let quitItem = NSMenuItem(title: "", action: #selector(quit), keyEquivalent: "q")
@@ -36,8 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastWriteStatus = ""
     private var lastActionStatus = ""
     private var activeRunMode: NaturalScrollRunMode = .manualOnly
-    private var lastSyncedTrackpadBaseline: Bool?
     private var permissionTimer: Timer?
+    private var permissionPollingDeadline: TimeInterval = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -46,13 +44,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastActionStatus = localizer.noSwitchYet
         configureMenu()
         configureMonitor()
-        startPermissionPolling()
+        configureRuntimeNotifications()
+        diagnosticsLogger.log("started version=\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown") os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
         refreshRuntimeState()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         permissionTimer?.invalidate()
         monitor.stop()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
+        diagnosticsLogger.flush()
     }
 
     private func configureMenu() {
@@ -66,10 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             autoSwitchItem,
             mouseNaturalItem,
             trackpadNaturalItem,
-            forceMouseDirectionItem,
             requestPermissionsItem,
             openInputSettingsItem,
-            openAccessibilitySettingsItem,
             switchMouseItem,
             switchTrackpadItem,
             quitItem
@@ -87,18 +87,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(autoSwitchItem)
         menu.addItem(mouseNaturalItem)
         menu.addItem(trackpadNaturalItem)
-        menu.addItem(forceMouseDirectionItem)
         menu.addItem(.separator())
         menu.addItem(switchMouseItem)
         menu.addItem(switchTrackpadItem)
         menu.addItem(.separator())
         menu.addItem(requestPermissionsItem)
         menu.addItem(openInputSettingsItem)
-        menu.addItem(openAccessibilitySettingsItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+        menu.delegate = self
         updateMenu()
     }
 
@@ -140,19 +139,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func configureRuntimeNotifications() {
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(
+                self, selector: #selector(refreshAfterActivation), name: name, object: nil
+            )
+        }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(refreshAfterActivation),
+            name: NSApplication.didBecomeActiveNotification, object: nil
+        )
+    }
+
+    @objc private func refreshAfterActivation(_ notification: Notification) {
+        refreshRuntimeState()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshRuntimeState()
+        updateMenu()
+    }
+
     private func startPermissionPolling() {
+        guard !permissionState.listenEventAccess else {
+            return
+        }
+        permissionTimer?.invalidate()
+        permissionPollingDeadline = ProcessInfo.processInfo.systemUptime + 120
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refreshRuntimeState()
+                guard let self else { return }
+                if ProcessInfo.processInfo.systemUptime >= self.permissionPollingDeadline {
+                    self.permissionTimer?.invalidate()
+                    self.permissionTimer = nil
+                    return
+                }
+                self.refreshRuntimeState()
             }
         }
+        permissionTimer?.tolerance = 0.5
     }
 
     private func refreshRuntimeState() {
         let newState = PermissionManager.currentState()
         let changed = newState != permissionState
+        let previousMode = activeRunMode
+        let previousMessage = lastTapMessage
         permissionState = newState
-        refreshMonitorConfiguration()
+        if permissionState.listenEventAccess {
+            permissionTimer?.invalidate()
+            permissionTimer = nil
+        }
         let desiredRunMode = NaturalScrollRunMode.resolve(
             inputMonitoringAllowed: permissionState.listenEventAccess,
             accessibilityTrusted: permissionState.accessibilityTrusted
@@ -193,9 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             activeRunMode = .manualOnly
         }
 
-        if changed {
-            updateMenu()
-        } else {
+        if changed || activeRunMode != previousMode || lastTapMessage != previousMessage {
+            diagnosticsLogger.log("runtime mode=\(activeRunMode.rawValue) inputMonitoring=\(permissionState.listenEventAccess)")
             updateMenu()
         }
     }
@@ -205,6 +241,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        guard lastInputSource != observation.source else {
+            return
+        }
         lastInputSource = observation.source
         lastActionStatus = localizer.eventAction(
             source: observation.source,
@@ -216,10 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             systemValue: preferences.currentValue()
         )
         switch activeRunMode {
-        case .eventCorrection:
-            applySystemSetting(for: observation.source)
-        case .globalFallback:
-            applySystemSetting(for: observation.source)
+        case .eventCorrection, .globalFallback:
+            applySystemSetting(for: observation.source, forceLiveRefresh: true)
         case .manualOnly:
             break
         }
@@ -227,19 +264,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenu()
     }
 
-    private func applySystemSetting(for source: InputSource) {
+    private func applySystemSetting(
+        for source: InputSource,
+        forceLiveRefresh: Bool = false
+    ) {
         let desiredValue = settings.naturalScrollEnabled(for: source)
-        if preferences.currentValue() == desiredValue {
+        let storedValue = preferences.currentValue()
+        let liveValue = preferences.currentLiveValue()
+        if storedValue == desiredValue && liveValue == desiredValue && !forceLiveRefresh {
             lastWriteStatus = localizer.alreadyApplied(source, naturalScrollEnabled: desiredValue)
             lastActionStatus = localizer.passThroughAction(source: source)
             refreshMonitorConfiguration()
             diagnosticsLogger.log(
-                "setting already source=\(source.rawValue) desired=\(desiredValue) observed=\(preferences.currentValue().map(String.init) ?? "unknown")"
+                "setting already source=\(source.rawValue) desired=\(desiredValue) stored=\(storedValue.map(String.init) ?? "unknown") live=\(liveValue.map(String.init) ?? "unknown")"
             )
             return
         }
 
-        let result = preferences.setNaturalScrollEnabled(desiredValue)
+        let result = preferences.setNaturalScrollEnabled(
+            desiredValue,
+            forceLiveRefresh: forceLiveRefresh
+        )
         if result.succeeded {
             refreshMonitorConfiguration()
             lastWriteStatus = localizer.didApply(source, naturalScrollEnabled: desiredValue)
@@ -248,41 +293,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 naturalScrollEnabled: desiredValue
             )
             diagnosticsLogger.log(
-                "setting wrote source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
+                "setting wrote source=\(source.rawValue) desired=\(desiredValue) stored=\(result.observedValue.map(String.init) ?? "unknown") live=\(result.liveObservedValue.map(String.init) ?? "unknown") systemAPI=\(result.usedLiveSystemAPI)"
             )
         } else {
             lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
             diagnosticsLogger.log(
-                "setting failed source=\(source.rawValue) desired=\(desiredValue) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
-            )
-        }
-    }
-
-    private func syncTrackpadBaselineIfNeeded(force: Bool) {
-        let baseline = settings.configuration.trackpadNaturalScrollEnabled
-        guard force || lastSyncedTrackpadBaseline != baseline || preferences.currentValue() != baseline else {
-            lastWriteStatus = localizer.trackpadBaselineAlreadySynced(enabled: baseline)
-            return
-        }
-
-        let result = preferences.setNaturalScrollEnabled(baseline)
-        if result.succeeded {
-            lastSyncedTrackpadBaseline = baseline
-            lastWriteStatus = localizer.trackpadBaselineSynced(enabled: baseline)
-            diagnosticsLogger.log(
-                "baseline wrote source=trackpad desired=\(baseline) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
-            )
-        } else {
-            lastWriteStatus = localizer.writeFailed(observedValue: result.observedValue)
-            diagnosticsLogger.log(
-                "baseline failed source=trackpad desired=\(baseline) observed=\(result.observedValue.map(String.init) ?? "unknown") refreshed=\(result.refreshedPreferencesDaemon)"
+                "setting failed source=\(source.rawValue) desired=\(desiredValue) stored=\(result.observedValue.map(String.init) ?? "unknown") live=\(result.liveObservedValue.map(String.init) ?? "unknown") systemAPI=\(result.usedLiveSystemAPI)"
             )
         }
     }
 
     private func refreshMonitorConfiguration() {
         var configuration = settings.configuration
-        configuration.systemNaturalScrollEnabled = preferences.currentValue()
+        configuration.systemNaturalScrollEnabled =
+            preferences.currentLiveValue() ?? preferences.currentValue()
         monitor.configuration = configuration
     }
 
@@ -307,8 +331,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseNaturalItem.state = configuration.mouseNaturalScrollEnabled ? .on : .off
         trackpadNaturalItem.title = localizer.trackpadNaturalScrolling
         trackpadNaturalItem.state = configuration.trackpadNaturalScrollEnabled ? .on : .off
-        forceMouseDirectionItem.title = localizer.forceMouseDirectionCorrection
-        forceMouseDirectionItem.state = configuration.forceMouseDirectionCorrection ? .on : .off
         switchMouseItem.title = localizer.switchToSourceTitle(
             .mouse,
             naturalScrollEnabled: configuration.mouseNaturalScrollEnabled
@@ -319,21 +341,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         requestPermissionsItem.title = localizer.requestPermissions
         openInputSettingsItem.title = localizer.openInputMonitoringSettings
-        openAccessibilitySettingsItem.title = localizer.openAccessibilitySettings
         quitItem.title = localizer.quit
 
+        let statusTitle: String
         switch lastInputSource {
         case .mouse:
-            statusItem.button?.title = localizer.statusBarTitle(enabled: configuration.mouseNaturalScrollEnabled)
+            statusTitle = localizer.statusBarTitle(enabled: configuration.mouseNaturalScrollEnabled)
         case .trackpad:
-            statusItem.button?.title = localizer.statusBarTitle(enabled: configuration.trackpadNaturalScrollEnabled)
+            statusTitle = localizer.statusBarTitle(enabled: configuration.trackpadNaturalScrollEnabled)
         case nil:
-            statusItem.button?.title = localizer.statusBarTitle(enabled: preferences.currentValue())
+            statusTitle = localizer.statusBarTitle(enabled: preferences.currentValue())
+        }
+        if statusItem.button?.title != statusTitle {
+            statusItem.button?.title = statusTitle
         }
 
         requestPermissionsItem.isHidden = permissionState.allPermissionsGranted
         openInputSettingsItem.isHidden = permissionState.listenEventAccess
-        openAccessibilitySettingsItem.isHidden = permissionState.accessibilityTrusted
     }
 
     private func localizedTapStatus(_ status: EventTapStatus) -> String {
@@ -353,7 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleAutomaticSwitching() {
         autoSwitchEnabled.toggle()
+        if autoSwitchEnabled {
+            lastInputSource = nil
+        }
         refreshRuntimeState()
+        updateMenu()
     }
 
     @objc private func toggleMouseNaturalScrolling() {
@@ -380,36 +408,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenu()
     }
 
-    @objc private func toggleForceMouseDirectionCorrection() {
-        let enabled = !settings.configuration.forceMouseDirectionCorrection
-        settings.setForceMouseDirectionCorrection(enabled)
-        refreshMonitorConfiguration()
-        lastWriteStatus = localizer.forceMouseDirectionCorrection
-        updateMenu()
-    }
-
     @objc private func requestPermissions() {
         permissionState = PermissionManager.requestPermissions()
         refreshRuntimeState()
+        startPermissionPolling()
     }
 
     @objc private func openInputMonitoringSettings() {
+        startPermissionPolling()
         PermissionManager.openInputMonitoringSettings()
-    }
-
-    @objc private func openAccessibilitySettings() {
-        PermissionManager.openAccessibilitySettings()
     }
 
     @objc private func switchToMouse() {
         lastInputSource = .mouse
-        applySystemSetting(for: .mouse)
+        monitor.resetInputSource(to: .mouse)
+        applySystemSetting(for: .mouse, forceLiveRefresh: true)
         updateMenu()
     }
 
     @objc private func switchToTrackpad() {
         lastInputSource = .trackpad
-        applySystemSetting(for: .trackpad)
+        monitor.resetInputSource(to: .trackpad)
+        applySystemSetting(for: .trackpad, forceLiveRefresh: true)
         updateMenu()
     }
 

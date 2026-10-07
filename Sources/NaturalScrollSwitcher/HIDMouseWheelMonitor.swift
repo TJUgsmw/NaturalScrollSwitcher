@@ -13,6 +13,19 @@ final class HIDMouseWheelMonitor {
 
         let newManager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         IOHIDManagerSetDeviceMatching(newManager, nil)
+        // Keep broad device matching for Bluetooth wheel collections, but only
+        // request wheel values. Pointer motion and keyboard values never reach us.
+        let wheelElements: [[String: UInt32]] = [
+            [
+                kIOHIDElementUsagePageKey: UInt32(kHIDPage_GenericDesktop),
+                kIOHIDElementUsageKey: UInt32(kHIDUsage_GD_Wheel)
+            ],
+            [
+                kIOHIDElementUsagePageKey: UInt32(kHIDPage_Consumer),
+                kIOHIDElementUsageKey: UInt32(kHIDUsage_Csmr_ACPan)
+            ]
+        ]
+        IOHIDManagerSetInputValueMatchingMultiple(newManager, wheelElements as CFArray)
         IOHIDManagerRegisterInputValueCallback(
             newManager,
             HIDMouseWheelMonitor.inputValueCallback,
@@ -60,11 +73,12 @@ final class HIDMouseWheelMonitor {
         let element = IOHIDValueGetElement(value)
         let usagePage = IOHIDElementGetUsagePage(element)
         let usage = IOHIDElementGetUsage(element)
-        let device = IOHIDElementGetDevice(element)
-
-        guard !isTrackpadLikeDevice(device),
-              isWheelElement(usagePage: usagePage, usage: usage),
+        guard isWheelElement(usagePage: usagePage, usage: usage),
               IOHIDValueGetIntegerValue(value) != 0 else {
+            return
+        }
+
+        guard !isTrackpadLikeDevice(IOHIDElementGetDevice(element)) else {
             return
         }
 

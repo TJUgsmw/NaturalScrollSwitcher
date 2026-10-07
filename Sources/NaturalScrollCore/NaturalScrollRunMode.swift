@@ -9,9 +9,7 @@ public enum NaturalScrollRunMode: String, Equatable, Sendable {
         inputMonitoringAllowed: Bool,
         accessibilityTrusted: Bool
     ) -> NaturalScrollRunMode {
-        if inputMonitoringAllowed && accessibilityTrusted {
-            return .eventCorrection
-        }
+        _ = accessibilityTrusted
         if inputMonitoringAllowed {
             return .globalFallback
         }

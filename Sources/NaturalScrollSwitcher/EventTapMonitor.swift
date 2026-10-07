@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import NaturalScrollCore
@@ -13,18 +14,16 @@ enum EventTapStatus {
 enum ScrollEventAction {
     case passedThrough
     case invertedScroll
-    case repostedInvertedScroll
 }
 
 struct ScrollEventObservation {
     let source: InputSource
     let action: ScrollEventAction
     let snapshot: ScrollEventSnapshot
+    let ioHIDModified: Bool
 }
 
 final class EventTapMonitor {
-    private static let syntheticEventMarker: Int64 = 0x4E535357
-
     var configuration = NaturalScrollConfiguration()
     var onInputEvent: ((ScrollEventObservation) -> Void)?
     var onTapStatus: ((EventTapStatus) -> Void)?
@@ -34,6 +33,8 @@ final class EventTapMonitor {
     private var runLoopSource: CFRunLoopSource?
     private(set) var activeRunMode: NaturalScrollRunMode?
     private var requestedRunMode: NaturalScrollRunMode?
+    private var sourceTracker = InputSourceTransitionTracker()
+    private var observationGeneration: UInt64 = 0
 
     var isRunning: Bool {
         eventTap != nil
@@ -106,7 +107,7 @@ final class EventTapMonitor {
     ) -> CFMachPort? {
         CGEvent.tapCreate(
             tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
+            place: .tailAppendEventTap,
             options: options,
             eventsOfInterest: mask,
             callback: EventTapMonitor.eventTapCallback,
@@ -115,6 +116,7 @@ final class EventTapMonitor {
     }
 
     func stop() {
+        resetInputSource()
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
@@ -129,6 +131,11 @@ final class EventTapMonitor {
         onTapStatus?(.stopped)
     }
 
+    func resetInputSource(to source: InputSource? = nil) {
+        observationGeneration &+= 1
+        sourceTracker.reset(to: source)
+    }
+
     private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let eventTap {
@@ -140,7 +147,8 @@ final class EventTapMonitor {
             return Unmanaged.passUnretained(event)
         }
 
-        if event.getIntegerValueField(.eventSourceUserData) == Self.syntheticEventMarker {
+        if Int64(type.rawValue) == ScrollEventClassifier.gestureEventTypeRawValue &&
+            sourceTracker.lastSource == .trackpad {
             return Unmanaged.passUnretained(event)
         }
 
@@ -153,51 +161,54 @@ final class EventTapMonitor {
         }
 
         let action: ScrollEventAction
+        var ioHIDModified = false
         if activeRunMode == .eventCorrection && decision.shouldInvertEvent && snapshot.hasInvertibleDeltas {
-            if shouldRepostInvertedEvent(for: decision), let eventCopy = event.copy() {
-                invertScrollEvent(eventCopy)
-                eventCopy.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEventMarker)
-                eventCopy.post(tap: .cgSessionEventTap)
-                action = .repostedInvertedScroll
-                notifyInputEvent(source: decision.source, action: action, snapshot: snapshot)
-                return nil
-            } else {
-                invertScrollEvent(event)
-                action = .invertedScroll
-            }
+            ioHIDModified = invertScrollEvent(event)
+            action = .invertedScroll
         } else {
             action = .passedThrough
         }
 
-        notifyInputEvent(source: decision.source, action: action, snapshot: snapshot)
+        if sourceTracker.observe(decision.source) {
+            notifyInputEvent(
+                source: decision.source,
+                action: action,
+                snapshot: snapshot,
+                ioHIDModified: ioHIDModified
+            )
+        }
 
         return Unmanaged.passUnretained(event)
-    }
-
-    private func shouldRepostInvertedEvent(for decision: ScrollEventDecision) -> Bool {
-        decision.source == .mouse &&
-            configuration.forceMouseDirectionCorrection &&
-            !configuration.mouseNaturalScrollEnabled
     }
 
     private func notifyInputEvent(
         source: InputSource,
         action: ScrollEventAction,
-        snapshot: ScrollEventSnapshot
+        snapshot: ScrollEventSnapshot,
+        ioHIDModified: Bool
     ) {
+        let generation = observationGeneration
         DispatchQueue.main.async { [weak self] in
-            self?.onInputEvent?(
+            guard let self, self.isRunning,
+                  self.observationGeneration == generation else {
+                return
+            }
+            self.onInputEvent?(
                 ScrollEventObservation(
                     source: source,
                     action: action,
-                    snapshot: snapshot
+                    snapshot: snapshot,
+                    ioHIDModified: ioHIDModified
                 )
             )
         }
     }
 
     private func makeSnapshot(type: CGEventType, event: CGEvent) -> ScrollEventSnapshot {
-        ScrollEventSnapshot(
+        if Int64(type.rawValue) == ScrollEventClassifier.gestureEventTypeRawValue {
+            return ScrollEventSnapshot(eventTypeRawValue: Int64(type.rawValue), isContinuousScroll: nil)
+        }
+        return ScrollEventSnapshot(
             eventTypeRawValue: Int64(type.rawValue),
             isContinuousScroll: type == .scrollWheel ? event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 : nil,
             deltaAxis1: event.getIntegerValueField(.scrollWheelEventDeltaAxis1),
@@ -211,20 +222,24 @@ final class EventTapMonitor {
             pointDeltaAxis3: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis3),
             scrollPhase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
             momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase),
-            recentMouseWheelInput: hidWheelMonitor.hasRecentMouseWheelInput()
+            recentMouseWheelInput: hidWheelMonitor.hasRecentMouseWheelInput(),
+            eventNaturalScrollEnabled: activeRunMode == .eventCorrection ? NSEvent(cgEvent: event)?.isDirectionInvertedFromDevice : nil
         )
     }
 
-    private func invertScrollEvent(_ event: CGEvent) {
+    private func invertScrollEvent(_ event: CGEvent) -> Bool {
+        // Set the coarse delta first. macOS recalculates fixed and point deltas
+        // when this field changes, so the precise fields must be written after it.
         invertIntegerField(.scrollWheelEventDeltaAxis1, on: event)
         invertIntegerField(.scrollWheelEventDeltaAxis2, on: event)
         invertIntegerField(.scrollWheelEventDeltaAxis3, on: event)
-        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis1, on: event)
-        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis2, on: event)
-        invertIntegerField(.scrollWheelEventFixedPtDeltaAxis3, on: event)
+        invertDoubleField(.scrollWheelEventFixedPtDeltaAxis1, on: event)
+        invertDoubleField(.scrollWheelEventFixedPtDeltaAxis2, on: event)
+        invertDoubleField(.scrollWheelEventFixedPtDeltaAxis3, on: event)
         invertIntegerField(.scrollWheelEventPointDeltaAxis1, on: event)
         invertIntegerField(.scrollWheelEventPointDeltaAxis2, on: event)
         invertIntegerField(.scrollWheelEventPointDeltaAxis3, on: event)
+        return IOHIDScrollEventBridge.shared.invertScrollValues(on: event)
     }
 
     private func invertIntegerField(_ field: CGEventField, on event: CGEvent) {
@@ -233,6 +248,14 @@ final class EventTapMonitor {
             return
         }
         event.setIntegerValueField(field, value: -value)
+    }
+
+    private func invertDoubleField(_ field: CGEventField, on event: CGEvent) {
+        let value = event.getDoubleValueField(field)
+        guard value != 0 else {
+            return
+        }
+        event.setDoubleValueField(field, value: -value)
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in

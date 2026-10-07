@@ -12,6 +12,7 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        defaults.removeObject(forKey: Key.forceMouseDirectionCorrection)
     }
 
     var configuration: NaturalScrollConfiguration {
@@ -23,10 +24,6 @@ final class AppSettings {
             trackpadNaturalScrollEnabled: bool(
                 forKey: Key.trackpadNaturalScrollEnabled,
                 defaultValue: true
-            ),
-            forceMouseDirectionCorrection: bool(
-                forKey: Key.forceMouseDirectionCorrection,
-                defaultValue: false
             )
         )
     }
@@ -42,10 +39,6 @@ final class AppSettings {
         case .trackpad:
             defaults.set(enabled, forKey: Key.trackpadNaturalScrollEnabled)
         }
-    }
-
-    func setForceMouseDirectionCorrection(_ enabled: Bool) {
-        defaults.set(enabled, forKey: Key.forceMouseDirectionCorrection)
     }
 
     private func bool(forKey key: String, defaultValue: Bool) -> Bool {

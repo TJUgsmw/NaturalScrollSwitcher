@@ -7,5 +7,6 @@ NaturalScrollSwitcher is a local macOS utility.
 - It does not record keystrokes.
 - It does not send data to a server.
 - It does not include analytics, telemetry, or network code.
+- Local diagnostics record startup, runtime changes, and setting writes. The log is capped at 1 MiB. Detailed input metadata is disabled by default and can be enabled explicitly for troubleshooting.
 
-macOS may require Input Monitoring and Accessibility permissions because event taps are protected system APIs.
+Automatic detection requires macOS Input Monitoring permission. Accessibility permission is not required for the passive listener.

@@ -10,26 +10,20 @@
 
 ## 中文简介
 
-macOS 的“自然滚动”是全局设置，系统没有给鼠标和触控板分别保存两个开关。NaturalScrollSwitcher v0.6.8 会根据当前权限自动选择最可用的运行方式：权限完整时同步系统设置并用事件修正补偿切换瞬间，只有输入监控时回退到全局设置切换，没有监听权限时仍保留手动切换。
+macOS 的“自然滚动”实际上是鼠标和触控板共用的一个全局设置。NaturalScrollSwitcher v0.7.2 根据当前输入设备切换系统自然滚动，并针对 macOS 27 的高频手势和菜单栏更新优化耗电。
 
-- 检测到普通鼠标滚轮时，会按鼠标偏好写入 macOS 自然滚动设置；默认是关闭自然滚动。
-- v0.6.0 起会同时监听 HID 鼠标滚轮输入，普通 USB/蓝牙滚轮鼠标不再只依赖 macOS 的连续滚动字段判断。
-- v0.6.5 起 HID 鼠标滚轮监听不再只匹配 `Mouse` 设备，也会捕获把滚轮挂在其他 HID 集合下的蓝牙鼠标。
-- 检测到触控板连续滚动或手势时，会按触控板偏好写入 macOS 自然滚动设置；默认是开启自然滚动。
-- v0.6.5 起写入系统自然滚动设置后会刷新 macOS 偏好守护进程，降低“读回已成功但当前 App 还没生效”的概率。
-- v0.6.6 修正了手动“切换到鼠标”在事件修正模式下没有把系统设置写成关闭的问题。
-- v0.6.7 增加“强制修正鼠标方向”，用于系统设置显示已关闭但实际滚动仍像开启的兼容场景。
-- v0.6.8 中强制修正会吞掉原始鼠标滚动事件并重发反向事件，适合原地修改事件不生效的环境。
-- 事件级修正会按当前系统设置和对应设备偏好决定是否修正，避免已经切换后继续双重反转。
-- v0.6.4 起会把事件识别结果写入 `~/Library/Logs/NaturalScrollSwitcher/events.log`，便于排查具体设备字段。
-- 如果辅助功能权限缺失或 macOS 拒绝可修改事件监听，会自动退回到写入系统自然滚动设置。
+- 检测到普通鼠标滚轮时，立即把系统自然滚动切换为鼠标偏好；默认关闭。
+- 同时监听 HID 滚轮值，支持把滚轮挂在其他 HID 集合下的 USB/蓝牙鼠标；不接收无关 HID 输入值。
+- 检测到触控板时，立即把系统自然滚动切换为触控板偏好；默认开启。
+- 同步系统实时设置和保存值，仅在输入设备变化时更新设置和界面。
+- 诊断日志只记录启动、运行状态变化和设置写入，后台写入，最大 1 MiB；详细事件字段默认关闭。
 - 如果输入监控权限缺失，自动检测会停用，但菜单里的手动鼠标/触控板切换仍可写入系统设置。
 - App 启动时只读取权限状态，不会每次自动弹权限请求；只有点击菜单里的“请求权限...”才会主动请求。
 - 默认保持常见习惯：鼠标自然滚动关闭，触控板自然滚动开启。
 - 你也可以在菜单里分别选择鼠标和触控板是否开启自然滚动。
 - App 菜单会跟随 macOS 系统语言显示中文或英文。
 - v0.4.0 起包含自定义 App 图标、菜单栏图标和拖拽安装 DMG 界面。
-- v0.5.1 起包含运行模式诊断，用来确认当前是事件修正、全局回退还是仅手动。
+- 菜单显示当前输入设备、系统设置、权限和运行状态。
 
 ## 下载和安装
 
@@ -37,16 +31,16 @@ macOS 的“自然滚动”是全局设置，系统没有给鼠标和触控板�
 
 当前默认下载包是本地 ad-hoc 签名，没有 Apple notarization。如果 macOS 提示“无法验证开发者”，可以在“系统设置 -> 隐私与安全性”里允许打开。
 
-如果你频繁自己重新构建并替换 App，建议用固定代码签名身份打包。ad-hoc 签名的权限身份是每次构建变化的 `cdhash`，macOS 可能会要求你重新授予输入监控/辅助功能权限。
+如果你频繁自己重新构建并替换 App，建议用固定代码签名身份打包。ad-hoc 签名的权限身份是每次构建变化的 `cdhash`，macOS 可能会要求你重新授予输入监控权限。
 
 首次运行后，请给 App 授权：
 
 1. 点击菜单栏里的 `NS On` 或 `NS Off`。
 2. 选择“请求权限...”或打开“输入监控设置”。
-3. 在系统设置中为 `NaturalScrollSwitcher.app` 启用输入监控权限和辅助功能权限。
+3. 在系统设置中为 `NaturalScrollSwitcher.app` 启用输入监控权限。
 4. 退出并重新打开 App。
 
-事件级滚动修正需要输入监控和辅助功能权限。只有输入监控权限时，App 会进入“全局设置回退”模式，仍会根据鼠标/触控板输入切换系统自然滚动设置。菜单里会显示当前权限和运行模式。
+自动切换只需要输入监控权限，不再需要辅助功能权限。菜单里会显示当前权限和运行模式。
 
 ## 使用说明
 
@@ -55,15 +49,13 @@ macOS 的“自然滚动”是全局设置，系统没有给鼠标和触控板�
 - `自动切换`：启用或暂停自动识别鼠标/触控板。
 - `鼠标自然滚动`：勾选后，鼠标模式会开启自然滚动；取消勾选则关闭。
 - `触控板自然滚动`：勾选后，触控板模式会开启自然滚动；取消勾选则关闭。
-- `强制修正鼠标方向`：当系统设置显示正确但鼠标实际方向仍反时，开启这个兼容开关。
-- `运行模式`：显示当前是“事件修正”“全局设置回退”还是“仅手动”。
+- `运行模式`：有输入监控权限时显示“全局设置回退”（直接切换系统设置），否则显示“仅手动”。
 - `切换到鼠标: 自然滚动开启/关闭`：立即按鼠标偏好写入系统自然滚动设置。
 - `切换到触控板: 自然滚动开启/关闭`：立即按触控板偏好写入系统自然滚动设置。
-- `最近动作`：显示最近滚动是否被修正，例如“已修正鼠标滚动”或“触控板滚动未修正”。
+- `最近动作`：显示最近一次设备切换写入的系统设置。
 - `打开输入监控设置`：打开 macOS 输入监控权限页面。
-- `打开辅助功能设置`：打开 macOS 辅助功能权限页面。
 
-Magic Mouse 的滚动事件更接近触控设备，v0.6.8 暂不承诺稳定识别。普通 USB/蓝牙滚轮鼠标是当前主要支持目标。
+Magic Mouse 的滚动事件更接近触控设备，暂不承诺稳定识别。普通 USB/蓝牙滚轮鼠标是当前主要支持目标。
 
 ## 从源码构建
 
@@ -112,16 +104,16 @@ codesign -dr - dist/NaturalScrollSwitcher.app
 会生成：
 
 ```text
-dist/NaturalScrollSwitcher-0.6.8-macos-<arch>.zip
-dist/NaturalScrollSwitcher-0.6.8-macos-<arch>.dmg
+dist/NaturalScrollSwitcher-0.7.2-macos-<arch>.zip
+dist/NaturalScrollSwitcher-0.7.2-macos-<arch>.dmg
 dist/checksums.txt
 ```
 
 推送 tag 后，GitHub Actions 会自动构建并创建 Release：
 
 ```sh
-git tag v0.6.8
-git push origin v0.6.8
+git tag v0.7.2
+git push origin v0.7.2
 ```
 
 ## 隐私
@@ -134,21 +126,17 @@ git push origin v0.6.8
 
 NaturalScrollSwitcher is a small macOS menu bar utility that gives ordinary mouse wheels and trackpads separate natural scrolling behavior.
 
-macOS exposes natural scrolling as one global setting. v0.6.8 chooses the best available runtime mode: system-setting sync plus event-level transition correction when both permissions are available, global setting fallback when only Input Monitoring is available, and manual-only switching when automatic input detection is unavailable.
+macOS exposes natural scrolling as one global setting shared by mouse and trackpad. v0.7.2 applies each device's preference to that live setting and reduces CPU use from high-frequency gestures and status bar updates on macOS 27.
 
 ### Features
 
-- Mouse wheel input writes the macOS natural scrolling setting to the mouse preference.
+- Mouse wheel input applies the configured mouse preference to the live system setting.
 - HID-level mouse wheel detection improves classification for ordinary USB/Bluetooth wheel mice.
-- v0.6.5 broadens HID wheel monitoring to devices that expose their wheel outside the standard mouse collection.
-- Trackpad continuous scroll or gesture input writes the macOS natural scrolling setting to the trackpad preference.
-- Preference writes refresh macOS preferences services to reduce stale natural scrolling behavior after programmatic writes.
-- v0.6.6 fixes manual "Switch to Mouse" so it writes the mouse system setting even when Event Correction mode is active.
-- v0.6.7 adds a Force Mouse Direction Correction compatibility toggle for systems where the setting shows off but the final mouse direction still behaves as natural.
-- v0.6.8 makes forced correction suppress the original mouse wheel event and repost an inverted event for environments where in-place event edits are ignored.
-- Event-level correction compares the active system setting with each device preference and avoids double inversion once the system setting has switched.
-- Local event diagnostics are written to `~/Library/Logs/NaturalScrollSwitcher/events.log`.
-- Automatic fallback to global natural scrolling setting sync when editable event taps are unavailable.
+- HID matching supports wheels outside the standard mouse collection while filtering out unrelated input values.
+- Trackpad input applies the configured trackpad preference to the live system setting.
+- Updates the live system setting and stored preference only when the input device changes.
+- Bounded background diagnostics at `~/Library/Logs/NaturalScrollSwitcher/events.log`; detailed snapshots are disabled by default.
+- No permanent permission polling when authorized; checks on menu opening, wake, and session activation.
 - The app no longer requests permissions automatically on every launch.
 - Manual mouse and trackpad switches always write the selected system setting.
 - Defaults: natural scrolling off for mouse, on for trackpad.
@@ -164,7 +152,7 @@ Download the latest `.dmg` or `.zip` from [Releases](https://github.com/TJUgsmw/
 
 The default package is ad-hoc signed for local use and is not notarized by Apple. macOS may show a first-run security warning.
 
-On first launch, grant both Input Monitoring and Accessibility permissions. Event-level correction requires both permissions. With only Input Monitoring, the app still switches through the global setting fallback.
+On first launch, grant Input Monitoring permission and reopen the app. Accessibility permission is not required. Manual switching remains available without Input Monitoring.
 
 For repeated local rebuilds, sign with a persistent identity to avoid macOS TCC treating each rebuilt app as a new `cdhash` identity:
 
@@ -184,4 +172,10 @@ PATH="$PWD/.venv/bin:$PATH" ./scripts/package_release.sh
 
 ### Notes
 
-Magic Mouse is not a stable v0.6.8 target because its scroll events are closer to touch devices than ordinary mouse wheels.
+Magic Mouse is not a stable target because its scroll events are closer to touch devices than ordinary mouse wheels.
+
+### Local Diagnostics
+
+The diagnostic log is capped at 1 MiB. To include detailed snapshots of source transitions, quit the app and launch the executable with `NSS_VERBOSE_EVENTS=1`.
+
+For a repeatable performance check, compile `scripts/gesture_load_probe.swift` with `swiftc -O` and run it for 10 seconds while measuring the app in Activity Monitor or `top`. It sends 240 zero-payload gesture events per second without moving the pointer. The listener will select the trackpad preference, so this check changes the natural scrolling setting. The `--mouse` option sends zero-delta wheel events to check mouse detection without scrolling the foreground app.

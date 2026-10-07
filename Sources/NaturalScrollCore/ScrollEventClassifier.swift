@@ -15,6 +15,7 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
     public var scrollPhase: Int64
     public var momentumPhase: Int64
     public var recentMouseWheelInput: Bool
+    public var eventNaturalScrollEnabled: Bool?
 
     public init(
         eventTypeRawValue: Int64,
@@ -30,7 +31,8 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
         pointDeltaAxis3: Int64 = 0,
         scrollPhase: Int64 = 0,
         momentumPhase: Int64 = 0,
-        recentMouseWheelInput: Bool = false
+        recentMouseWheelInput: Bool = false,
+        eventNaturalScrollEnabled: Bool? = nil
     ) {
         self.eventTypeRawValue = eventTypeRawValue
         self.isContinuousScroll = isContinuousScroll
@@ -46,6 +48,7 @@ public struct ScrollEventSnapshot: Equatable, Sendable {
         self.scrollPhase = scrollPhase
         self.momentumPhase = momentumPhase
         self.recentMouseWheelInput = recentMouseWheelInput
+        self.eventNaturalScrollEnabled = eventNaturalScrollEnabled
     }
 
     public var hasWheelSteps: Bool {
@@ -140,11 +143,10 @@ public enum ScrollEventClassifier {
             return nil
         }
 
-        let baseline = configuration.systemNaturalScrollEnabled ?? configuration.trackpadNaturalScrollEnabled
+        let baseline = snapshot.eventNaturalScrollEnabled ??
+            configuration.systemNaturalScrollEnabled ??
+            configuration.trackpadNaturalScrollEnabled
         let desired = configuration.naturalScrollEnabled(for: source)
-        if source == .mouse && configuration.forceMouseDirectionCorrection && !desired {
-            return ScrollEventDecision(source: source, shouldInvertEvent: true)
-        }
         return ScrollEventDecision(source: source, shouldInvertEvent: baseline != desired)
     }
 }

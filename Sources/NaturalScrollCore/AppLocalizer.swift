@@ -110,15 +110,6 @@ public struct AppLocalizer: Sendable {
         }
     }
 
-    public var forceMouseDirectionCorrection: String {
-        switch language {
-        case .english:
-            return "Force Mouse Direction Correction"
-        case .simplifiedChinese:
-            return "强制修正鼠标方向"
-        }
-    }
-
     public var requestPermissions: String {
         switch language {
         case .english:
@@ -191,15 +182,14 @@ public struct AppLocalizer: Sendable {
     }
 
     public func permissionsTitle(inputAccess: Bool, accessibilityTrusted: Bool) -> String {
+        _ = accessibilityTrusted
         switch language {
         case .english:
             let input = inputAccess ? "Input OK" : "Input Missing"
-            let accessibility = accessibilityTrusted ? "AX OK" : "AX Missing"
-            return "Permissions: \(input), \(accessibility)"
+            return "Permission: \(input)"
         case .simplifiedChinese:
             let input = inputAccess ? "输入监控已授权" : "输入监控未授权"
-            let accessibility = accessibilityTrusted ? "辅助功能已授权" : "辅助功能未授权"
-            return "权限：\(input)，\(accessibility)"
+            return "权限：\(input)"
         }
     }
 

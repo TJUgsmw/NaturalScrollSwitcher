@@ -1,18 +1,24 @@
 import Foundation
+import Darwin
 
 public struct PreferenceWriteResult: Equatable {
     public let requestedValue: Bool
     public let synchronized: Bool
     public let refreshedPreferencesDaemon: Bool
     public let observedValue: Bool?
+    public let liveObservedValue: Bool?
+    public let usedLiveSystemAPI: Bool
 
     public var succeeded: Bool {
-        synchronized && observedValue == requestedValue
+        synchronized &&
+            observedValue == requestedValue &&
+            (liveObservedValue == nil || liveObservedValue == requestedValue)
     }
 }
 
 public final class NaturalScrollPreferences {
     private let key = "com.apple.swipescrolldirection" as CFString
+    private let liveAPI = SwipeScrollDirectionAPI()
 
     public init() {}
 
@@ -41,7 +47,28 @@ public final class NaturalScrollPreferences {
         return nil
     }
 
-    public func setNaturalScrollEnabled(_ enabled: Bool) -> PreferenceWriteResult {
+    public func currentLiveValue() -> Bool? {
+        liveAPI?.currentValue()
+    }
+
+    public func setNaturalScrollEnabled(
+        _ enabled: Bool,
+        forceLiveRefresh: Bool = false
+    ) -> PreferenceWriteResult {
+        let storedBeforeWrite = currentValue()
+        let liveBeforeWrite = currentLiveValue()
+
+        if let liveAPI {
+            // The private setter is what System Settings uses. Calling it updates
+            // the live HID preference; CFPreferences alone only changes the UI.
+            if forceLiveRefresh &&
+                storedBeforeWrite == enabled &&
+                liveBeforeWrite != enabled {
+                liveAPI.setValue(!enabled)
+            }
+            liveAPI.setValue(enabled)
+        }
+
         CFPreferencesSetValue(
             key,
             enabled ? kCFBooleanTrue : kCFBooleanFalse,
@@ -55,13 +82,15 @@ public final class NaturalScrollPreferences {
             kCFPreferencesCurrentUser,
             kCFPreferencesAnyHost
         )
-        let refreshed = Self.refreshPreferencesDaemon()
+        let refreshed = liveAPI == nil ? Self.refreshPreferencesDaemon() : false
 
         return PreferenceWriteResult(
             requestedValue: enabled,
             synchronized: synchronized,
             refreshedPreferencesDaemon: refreshed,
-            observedValue: currentValue()
+            observedValue: currentValue(),
+            liveObservedValue: currentLiveValue(),
+            usedLiveSystemAPI: liveAPI != nil
         )
     }
 
@@ -77,5 +106,39 @@ public final class NaturalScrollPreferences {
         } catch {
             return false
         }
+    }
+}
+
+private final class SwipeScrollDirectionAPI {
+    private typealias Getter = @convention(c) () -> Int8
+    private typealias Setter = @convention(c) (Int8) -> Void
+
+    private let handle: UnsafeMutableRawPointer
+    private let getter: Getter
+    private let setter: Setter
+
+    init?() {
+        let path = "/System/Library/PrivateFrameworks/PreferencePanesSupport.framework/PreferencePanesSupport"
+        guard let handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL),
+              let getterSymbol = dlsym(handle, "swipeScrollDirection"),
+              let setterSymbol = dlsym(handle, "setSwipeScrollDirection") else {
+            return nil
+        }
+
+        self.handle = handle
+        getter = unsafeBitCast(getterSymbol, to: Getter.self)
+        setter = unsafeBitCast(setterSymbol, to: Setter.self)
+    }
+
+    deinit {
+        dlclose(handle)
+    }
+
+    func currentValue() -> Bool {
+        getter() != 0
+    }
+
+    func setValue(_ enabled: Bool) {
+        setter(enabled ? 1 : 0)
     }
 }

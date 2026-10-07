@@ -12,7 +12,7 @@ struct PermissionState: Equatable {
     }
 
     var allPermissionsGranted: Bool {
-        listenEventAccess && accessibilityTrusted
+        listenEventAccess
     }
 }
 
@@ -27,10 +27,6 @@ enum PermissionManager {
     @discardableResult
     static func requestPermissions() -> PermissionState {
         _ = CGRequestListenEventAccess()
-
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options = [promptKey: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
 
         return currentState()
     }
